@@ -38,6 +38,12 @@ import RecruiterSettings from '../pages/Recruiter/Settings';
 
 import ProtectedRoute from '../components/layout/ProtectedRoute';
 
+// Admin Pages
+import AdminDashboard from '../pages/Admin/Dashboard';
+import ManageUsers from '../pages/Admin/ManageUsers';
+import AdminManageJobs from '../pages/Admin/ManageJobs';
+import ManageApplications from '../pages/Admin/ManageApplications';
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -225,6 +231,40 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterSettings />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin Routes */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ManageUsers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/jobs"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminManageJobs />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/applications"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ManageApplications />
           </ProtectedRoute>
         }
       />

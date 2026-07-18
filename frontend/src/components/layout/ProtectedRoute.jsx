@@ -20,6 +20,9 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   // If role is not allowed, redirect to their respective dashboard
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to={user.role === 'recruiter' ? '/recruiter' : '/dashboard'} replace />;
   }
 

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../../components/layout/Navbar';
 import Footer from '../../components/layout/Footer';
-import { jobs, companies } from '../../data/mockData';
 import { HiSearch, HiSparkles, HiCheckCircle, HiTrendingUp, HiUserGroup, HiShieldCheck } from 'react-icons/hi';
 import { motion } from 'framer-motion';
 
@@ -12,14 +11,8 @@ export default function Home() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    // Redirect to login or jobs list (will redirect to /login if guest, since jobs is protected, or jobs page if logged in)
-    // To make it friendly, redirect to /login or /jobs with query parameter
     navigate(`/login?q=${encodeURIComponent(searchVal)}`);
   };
-
-  // Get first 3 jobs as featured
-  const featuredJobs = jobs.slice(0, 3);
-  const featuredCompanies = companies.slice(0, 3);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -115,39 +108,22 @@ export default function Home() {
       {/* Main Content Info */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
         
-        {/* Featured Jobs */}
+        {/* How It Works Section */}
         <section className="space-y-8">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">Featured Job Openings</h2>
-            <p className="text-xs text-gray-500 mt-1">Explore some of our trending positions matching active seeker profiles.</p>
+            <h2 className="text-2xl font-bold text-gray-900">How TalentSync Works</h2>
+            <p className="text-xs text-gray-500 mt-1">Three steps to land your next role or hire the right candidate.</p>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {featuredJobs.map((job) => (
-              <div key={job.id} className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm hover:shadow hover:border-blue-300 transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center space-x-3 mb-4">
-                    <span className="text-2xl">{job.companyLogo}</span>
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-400 uppercase">{job.companyName}</h4>
-                      <h3 className="text-sm font-bold text-gray-800 line-clamp-1">{job.title}</h3>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed mb-4">{job.description}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {job.skills.slice(0, 3).map((skill) => (
-                      <span key={skill} className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded font-medium">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <Link
-                  to="/login"
-                  className="mt-6 block text-center py-2 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                >
-                  View details & apply
-                </Link>
+            {[
+              { step: '01', title: 'Create Your Profile', desc: 'Sign up as a job seeker or recruiter. Fill in your background, skills, and goals.', color: 'bg-blue-50 text-blue-600' },
+              { step: '02', title: 'AI Matches You', desc: 'Our AI engine parses your resume and instantly scores compatibility with live job postings.', color: 'bg-emerald-50 text-emerald-600' },
+              { step: '03', title: 'Apply or Hire', desc: 'Candidates apply in one click. Recruiters review ranked applicants and schedule interviews.', color: 'bg-purple-50 text-purple-600' },
+            ].map(item => (
+              <div key={item.step} className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center space-y-3">
+                <span className={`text-2xl font-black px-4 py-2 rounded-lg inline-block ${item.color}`}>{item.step}</span>
+                <h3 className="text-sm font-bold text-gray-800">{item.title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -184,23 +160,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Top Companies */}
-        <section className="space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900">Partner Companies</h2>
-            <p className="text-xs text-gray-500 mt-1">Leading startups and enterprise platforms hiring directly on our portal.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {featuredCompanies.map((c) => (
-              <div key={c.id} className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm text-center">
-                <span className="text-4xl block mb-2">{c.logo}</span>
-                <h3 className="text-sm font-bold text-gray-800">{c.name}</h3>
-                <p className="text-[10px] text-gray-400 mt-0.5">{c.industry}</p>
-                <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{c.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+
 
         {/* Testimonials */}
         <section className="bg-blue-600 rounded-2xl py-12 px-6 sm:px-12 text-white relative overflow-hidden">

@@ -50,7 +50,7 @@ export default function CandidateCard({ candidate }) {
         <div className="mt-4">
           <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Top Skills</span>
           <div className="mt-1 flex flex-wrap gap-1">
-            {candidate.skills.map((skill) => (
+            {(candidate.skills || []).map((skill) => (
               <span key={skill} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] px-2 py-0.5 rounded-md font-medium">
                 {skill}
               </span>

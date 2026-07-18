@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { notifications as initialNotifications } from '../../data/mockData';
+import { notificationService } from '../../services/notificationService';
 import { HiMenu, HiX, HiBell, HiUser, HiChevronDown, HiLogout, HiCog } from 'react-icons/hi';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -12,9 +12,15 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
-  const [notifications, setNotifications] = useState(
-    initialNotifications.filter((n) => !user || n.role === user.role)
-  );
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      notificationService.getByRole(user.role)
+        .then((data) => setNotifications(data))
+        .catch((err) => console.error(err));
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -23,8 +29,14 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const markAllRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+  const markAllRead = async () => {
+    try {
+      const unread = notifications.filter((n) => !n.read);
+      await Promise.all(unread.map(n => notificationService.markAsRead(n.id)));
+      setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -46,6 +58,14 @@ export default function Navbar() {
         { path: '/recruiter/analytics', label: 'Analytics' },
       ];
     }
+    if (user.role === 'admin') {
+      return [
+        { path: '/admin', label: 'Dashboard' },
+        { path: '/admin/users', label: 'Manage Users' },
+        { path: '/admin/jobs', label: 'Manage Jobs' },
+        { path: '/admin/applications', label: 'Manage Applications' },
+      ];
+    }
     return [
       { path: '/dashboard', label: 'Dashboard' },
       { path: '/jobs', label: 'Find Jobs' },
@@ -62,7 +82,7 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to={user ? (user.role === 'recruiter' ? '/recruiter' : '/dashboard') : '/'} className="flex items-center space-x-2">
+            <Link to={user ? (user.role === 'admin' ? '/admin' : (user.role === 'recruiter' ? '/recruiter' : '/dashboard')) : '/'} className="flex items-center space-x-2">
               <span className="text-2xl">🚀</span>
               <span className="text-xl font-bold tracking-tight text-blue-600">
                 TalentSync
@@ -194,6 +214,16 @@ export default function Navbar() {
                               className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                             >
                               <HiCog className="mr-2 h-4 w-4 text-gray-400" /> Settings
+                            </Link>
+                          </>
+                        ) : user.role === 'admin' ? (
+                          <>
+                            <Link
+                              to="/admin"
+                              onClick={() => setProfileDropdownOpen(false)}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <HiUser className="mr-2 h-4 w-4 text-gray-400" /> Admin Panel
                             </Link>
                           </>
                         ) : (

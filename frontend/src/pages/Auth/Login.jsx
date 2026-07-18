@@ -9,7 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('seeker'); // 'seeker' or 'recruiter'
+  const [role, setRole] = useState('seeker'); // 'seeker' | 'recruiter' | 'admin'
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -27,6 +27,8 @@ export default function Login() {
       setTimeout(() => {
         if (role === 'recruiter') {
           navigate('/recruiter');
+        } else if (role === 'admin') {
+          navigate('/admin');
         } else {
           navigate('/dashboard');
         }
@@ -73,7 +75,7 @@ export default function Login() {
             {/* Role Picker (Tabs) */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">I want to login as a:</label>
-              <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-lg">
+              <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1 rounded-lg">
                 <button
                   type="button"
                   onClick={() => setRole('seeker')}
@@ -95,6 +97,17 @@ export default function Login() {
                   }`}
                 >
                   Recruiter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('admin')}
+                  className={`py-2 text-xs font-semibold rounded-md transition-all ${
+                    role === 'admin'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-950'
+                  }`}
+                >
+                  Admin
                 </button>
               </div>
             </div>
@@ -182,14 +195,21 @@ export default function Login() {
           {/* Quick Demo Credentials */}
           <div className="mt-6 pt-6 border-t border-gray-150">
             <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Demo Credentials:</h4>
-            <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 bg-gray-50 p-2.5 rounded-lg border border-gray-150">
+            <div className="grid grid-cols-3 gap-2 text-[9px] text-gray-500 bg-gray-50 p-2.5 rounded-lg border border-gray-150">
               <div>
-                <p className="font-bold text-gray-700">Seeker Account:</p>
-                <p>alex@example.com / 12345</p>
+                <p className="font-bold text-gray-700">Seeker:</p>
+                <p className="break-all">alex@example.com</p>
+                <p>pwd: 12345</p>
               </div>
               <div>
-                <p className="font-bold text-gray-700">Recruiter Account:</p>
-                <p>jane@company.com / 12345</p>
+                <p className="font-bold text-gray-700">Recruiter:</p>
+                <p className="break-all">jane@company.com</p>
+                <p>pwd: 12345</p>
+              </div>
+              <div>
+                <p className="font-bold text-gray-700">Admin:</p>
+                <p className="break-all">admin@talentsync.com</p>
+                <p>pwd: admin</p>
               </div>
             </div>
           </div>

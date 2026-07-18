@@ -66,7 +66,7 @@ export default function JobCard({ job, onApply, isApplied = false }) {
 
         {/* Skill Tags */}
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {job.skills.map((skill) => (
+          {(job.skills || []).map((skill) => (
             <span key={skill} className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-md font-medium">
               {skill}
             </span>

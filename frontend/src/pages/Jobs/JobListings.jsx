@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import JobCard from '../../components/cards/JobCard';
 import SearchBar from '../../components/common/SearchBar';
 import FilterSidebar from '../../components/common/FilterSidebar';
 import EmptyState from '../../components/common/EmptyState';
 import Toast from '../../components/common/Toast';
-import { jobs as initialJobs, applications as initialApplications } from '../../data/mockData';
+import { jobService } from '../../services/jobService';
+import { applicationService } from '../../services/applicationService';
 import { useAuth } from '../../context/AuthContext';
 
 export default function JobListings() {
   const { user } = useAuth();
-  const [jobs, setJobs] = useState(initialJobs);
-  const [appliedJobs, setAppliedJobs] = useState(
-    initialApplications.map((app) => app.jobId)
-  );
+  const [jobs, setJobs] = useState([]);
+  const [appliedJobs, setAppliedJobs] = useState([]);
   const [searchVal, setSearchVal] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [toast, setToast] = useState(null);
@@ -26,13 +25,45 @@ export default function JobListings() {
     aiOnly: false
   });
 
-  const handleApply = (job) => {
-    if (appliedJobs.includes(job.id)) return;
-    setAppliedJobs([...appliedJobs, job.id]);
-    setToast({
-      message: `Successfully applied to ${job.title} at ${job.companyName}!`,
-      type: 'success'
-    });
+  useEffect(() => {
+    // Load jobs from live backend
+    jobService.getAll()
+      .then((data) => setJobs(data))
+      .catch((err) => console.error(err));
+
+    // Load applied jobs from backend (mock candidate ID = 1)
+    applicationService.getByCandidateId('1')
+      .then((apps) => setAppliedJobs(apps.map(a => a.jobId)))
+      .catch((err) => console.error(err));
+  }, []);
+
+  const handleApply = async (job) => {
+    const stringJobId = job.id.toString();
+    if (appliedJobs.includes(stringJobId)) return;
+    
+    try {
+      await applicationService.apply({
+        jobId: stringJobId,
+        jobTitle: job.title,
+        companyName: job.companyName,
+        status: 'Applied',
+        candidateId: user?.id ? String(user.id) : '1',
+        candidateName: user?.name || 'Alex Johnson',
+        recruiterId: job.recruiterId,
+        recruiterEmail: job.recruiterEmail,
+        matchScore: 88
+      });
+      setAppliedJobs([...appliedJobs, stringJobId]);
+      setToast({
+        message: `Successfully applied to ${job.title} at ${job.companyName}!`,
+        type: 'success'
+      });
+    } catch (err) {
+      setToast({
+        message: 'Could not submit application. Try again.',
+        type: 'error'
+      });
+    }
   };
 
   // Filtering Logic
@@ -147,7 +178,7 @@ export default function JobListings() {
                     key={job.id}
                     job={job}
                     onApply={handleApply}
-                    isApplied={appliedJobs.includes(job.id)}
+                    isApplied={appliedJobs.includes(job.id?.toString())}
                   />
                 ))}
               </div>

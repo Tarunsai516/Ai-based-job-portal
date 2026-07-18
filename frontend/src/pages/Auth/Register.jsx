@@ -5,7 +5,7 @@ import { HiUser, HiMail, HiLockClosed } from 'react-icons/hi';
 import Toast from '../../components/common/Toast';
 
 export default function Register() {
-  const { setUser } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,17 +22,9 @@ export default function Register() {
     }
 
     setLoading(true);
-    // Simulate delay
-    setTimeout(() => {
-      const mockUser = {
-        name,
-        email,
-        role,
-      };
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+    try {
+      await register(name, email, password, role);
       setToast({ message: 'Account created successfully! Redirecting...', type: 'success' });
-      
       setTimeout(() => {
         setLoading(false);
         if (role === 'recruiter') {
@@ -41,7 +33,10 @@ export default function Register() {
           navigate('/dashboard');
         }
       }, 1000);
-    }, 800);
+    } catch (err) {
+      setLoading(false);
+      setToast({ message: err.response?.data?.message || 'Registration failed.', type: 'error' });
+    }
   };
 
   return (

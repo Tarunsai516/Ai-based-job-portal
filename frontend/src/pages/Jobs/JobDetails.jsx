@@ -1,18 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
-import { jobs } from '../../data/mockData';
+import { jobService } from '../../services/jobService';
+import { applicationService } from '../../services/applicationService';
 import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare } from 'react-icons/hi';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [applied, setApplied] = useState(false);
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Find job details
-  const job = jobs.find((j) => j.id === id);
+  useEffect(() => {
+    setLoading(true);
+    jobService.getById(id)
+      .then((data) => {
+        setJob(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+
+    // Check if already applied (mock candidate ID = 1)
+    applicationService.getByCandidateId('1')
+      .then((apps) => {
+        const hasApplied = apps.some((app) => app.jobId === id.toString());
+        setApplied(hasApplied);
+      })
+      .catch((err) => console.error(err));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <LoadingSpinner fullPage />
+      </DashboardLayout>
+    );
+  }
 
   if (!job) {
     return (
@@ -28,13 +58,31 @@ export default function JobDetails() {
     );
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (applied) return;
-    setApplied(true);
-    setToast({
-      message: `Application submitted successfully for ${job.title}!`,
-      type: 'success'
-    });
+    try {
+      await applicationService.apply({
+        jobId: job.id.toString(),
+        jobTitle: job.title,
+        companyName: job.companyName,
+        status: 'Applied',
+        candidateId: user?.id ? String(user.id) : '1',
+        candidateName: user?.name || 'Alex Johnson',
+        recruiterId: job.recruiterId,
+        recruiterEmail: job.recruiterEmail,
+        matchScore: 88
+      });
+      setApplied(true);
+      setToast({
+        message: `Application submitted successfully for ${job.title}!`,
+        type: 'success'
+      });
+    } catch (err) {
+      setToast({
+        message: 'Failed to submit application. Try again.',
+        type: 'error'
+      });
+    }
   };
 
   const handleShare = () => {

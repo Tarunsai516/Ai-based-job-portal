@@ -1,17 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
-import { candidates } from '../../data/mockData';
+import { candidateService } from '../../services/candidateService';
 import { HiOutlineChevronLeft, HiOutlineMail, HiOutlinePhone, HiOutlineLocationMarker, HiCheckCircle, HiOutlineDownload } from 'react-icons/hi';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function CandidateDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
-  const [status, setStatus] = useState('Pending'); // 'Pending' | 'Shortlisted' | 'Interview Scheduled'
+  const [status, setStatus] = useState('Pending'); 
+  const [candidate, setCandidate] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const candidate = candidates.find((c) => c.id === id) || candidates[0];
+  useEffect(() => {
+    setLoading(true);
+    // Parse route ID parameter (which could be string or numeric)
+    const queryId = isNaN(id) ? 1 : parseInt(id, 10);
+    candidateService.getById(queryId)
+      .then((data) => {
+        setCandidate(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [id]);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <LoadingSpinner fullPage />
+      </DashboardLayout>
+    );
+  }
+
+  if (!candidate) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <h2 className="text-xl font-bold">Candidate Not Found</h2>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const handleShortlist = () => {
     setStatus('Shortlisted');
@@ -166,7 +200,7 @@ export default function CandidateDetails() {
                   <HiCheckCircle className="h-4 w-4 mr-1" /> Matching Skills
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {candidate.skills.map((skill) => (
+                  {(candidate.skills || []).map((skill) => (
                     <span key={skill} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs px-2.5 py-0.5 rounded-md font-semibold">
                       {skill}
                     </span>
@@ -180,7 +214,7 @@ export default function CandidateDetails() {
                   Missing Skills
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {candidate.missingSkills.map((skill) => (
+                  {(candidate.missingSkills || []).map((skill) => (
                     <span key={skill} className="bg-red-50 text-red-750 border border-red-100 text-xs px-2.5 py-0.5 rounded-md font-semibold">
                       {skill}
                     </span>
