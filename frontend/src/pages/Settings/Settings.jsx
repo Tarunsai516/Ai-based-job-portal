@@ -83,6 +83,34 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* Database & MySQL Workbench Configuration */}
+          <div className="space-y-4 pt-6 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Database Engine & MySQL Workbench</h3>
+                <p className="text-[11px] text-gray-600 mt-1">Backend configured for MySQL 8.0+ / MySQL Workbench connection.</p>
+              </div>
+              <span className="px-2.5 py-1 text-[10px] font-extrabold rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                MySQL Target
+              </span>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-700 font-mono text-[11px]">
+                <span className="font-semibold text-slate-500">JDBC URL:</span>
+                <span className="font-bold text-slate-900 bg-white px-2 py-0.5 border border-slate-200 rounded">jdbc:mysql://localhost:3306/talentsync</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-700 font-mono text-[11px]">
+                <span className="font-semibold text-slate-500">Database Name:</span>
+                <span className="font-bold text-slate-900 bg-white px-2 py-0.5 border border-slate-200 rounded">talentsync</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-700 font-mono text-[11px]">
+                <span className="font-semibold text-slate-500">Workbench SQL Setup Script:</span>
+                <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 border border-blue-200 rounded">backend/src/main/resources/setup_mysql.sql</span>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end pt-4">
             <button
               type="submit"

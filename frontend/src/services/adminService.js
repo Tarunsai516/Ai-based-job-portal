@@ -34,5 +34,10 @@ export const adminService = {
   deleteApplication: async (id) => {
     const response = await api.delete(`/admin/applications/${id}`);
     return response.data;
+  },
+
+  getDatabaseInfo: async () => {
+    const response = await api.get('/system/database-info');
+    return response.data;
   }
 };

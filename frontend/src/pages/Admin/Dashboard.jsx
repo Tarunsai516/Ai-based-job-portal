@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { adminService } from '../../services/adminService';
-import { HiOutlineUserGroup, HiOutlineBriefcase, HiOutlineClipboardList, HiOutlinePlusCircle, HiOutlineClock } from 'react-icons/hi';
+import { HiOutlineUserGroup, HiOutlineBriefcase, HiOutlineClipboardList, HiOutlinePlusCircle, HiOutlineClock, HiOutlineDatabase, HiOutlineServer, HiOutlineCheckCircle } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState(null);
+  const [dbInfo, setDbInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    adminService.getAnalytics()
-      .then((data) => {
-        setAnalytics(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    Promise.allSettled([
+      adminService.getAnalytics(),
+      adminService.getDatabaseInfo()
+    ]).then(([analyticsRes, dbRes]) => {
+      if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value);
+      if (dbRes.status === 'fulfilled') setDbInfo(dbRes.value);
+      setLoading(false);
+    });
   }, []);
 
   const stats = [
@@ -161,6 +161,56 @@ export default function AdminDashboard() {
             )}
           </div>
 
+        </div>
+
+        {/* Database & MySQL Workbench Connection Monitor */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 text-white p-6 rounded-2xl shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-blue-600/20 border border-blue-500/30 rounded-xl text-blue-400">
+                <HiOutlineDatabase className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>Database Engine & MySQL Workbench Integration</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                    Active Target: MySQL
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">Connected database runtime, MySQL Workbench parameters, and driver details.</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                dbInfo?.status === 'CONNECTED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              }`}>
+                <HiOutlineCheckCircle className="h-4 w-4" />
+                <span>{dbInfo?.status || 'MySQL Ready'}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-1">
+            <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Database Engine</p>
+              <p className="text-sm font-bold text-slate-200 mt-1 truncate">{dbInfo?.databaseType || 'MySQL Workbench / MySQL'}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Database Name / Host</p>
+              <p className="text-sm font-bold text-slate-200 mt-1 truncate">{dbInfo?.databaseName || 'talentsync'} @ {dbInfo?.host || 'localhost:3306'}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">JDBC Driver</p>
+              <p className="text-sm font-bold text-slate-200 mt-1 truncate">{dbInfo?.driverName || 'com.mysql.cj.jdbc.Driver'}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">MySQL Workbench GUI</p>
+              <p className="text-sm font-bold text-emerald-400 mt-1 truncate">Compatible (schema: talentsync)</p>
+            </div>
+          </div>
         </div>
 
       </div>
