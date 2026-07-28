@@ -43,6 +43,7 @@ import AdminDashboard from '../pages/Admin/Dashboard';
 import ManageUsers from '../pages/Admin/ManageUsers';
 import AdminManageJobs from '../pages/Admin/ManageJobs';
 import ManageApplications from '../pages/Admin/ManageApplications';
+import SupportTickets from '../pages/Admin/SupportTickets';
 
 export default function AppRoutes() {
   return (
@@ -265,6 +266,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['admin']}>
             <ManageApplications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/support"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <SupportTickets />
           </ProtectedRoute>
         }
       />

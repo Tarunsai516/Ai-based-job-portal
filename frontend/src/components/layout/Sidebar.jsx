@@ -10,7 +10,8 @@ import {
   HiSparkles,
   HiClipboardList,
   HiOfficeBuilding,
-  HiUpload
+  HiUpload,
+  HiOutlineTicket
 } from 'react-icons/hi';
 
 export default function Sidebar() {
@@ -44,6 +45,7 @@ export default function Sidebar() {
     { to: '/admin/users', label: 'Manage Users', icon: HiUser },
     { to: '/admin/jobs', label: 'Manage Jobs', icon: HiBriefcase },
     { to: '/admin/applications', label: 'Manage Applications', icon: HiClipboardList },
+    { to: '/admin/support', label: 'Support Tickets', icon: HiOutlineTicket },
   ];
 
   const links = user.role === 'admin' ? adminLinks : (user.role === 'recruiter' ? recruiterLinks : seekerLinks);
