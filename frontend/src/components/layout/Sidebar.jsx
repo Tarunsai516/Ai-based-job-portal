@@ -51,8 +51,8 @@ export default function Sidebar() {
   const links = user.role === 'admin' ? adminLinks : (user.role === 'recruiter' ? recruiterLinks : seekerLinks);
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] p-4 space-y-1">
-      <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+    <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 min-h-[calc(100vh-4rem)] p-4 space-y-1 transition-colors duration-300">
+      <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
         Navigation
       </div>
       <div className="flex-1 space-y-1">
@@ -66,8 +66,8 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400'
                 }`
               }
             >

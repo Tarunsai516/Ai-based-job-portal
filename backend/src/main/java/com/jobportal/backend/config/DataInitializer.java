@@ -4,6 +4,7 @@ import com.jobportal.backend.model.*;
 import com.jobportal.backend.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import java.util.List;
 
@@ -15,6 +16,9 @@ public class DataInitializer implements CommandLineRunner {
 
     @Autowired
     private CandidateRepository candidateRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
@@ -28,21 +32,21 @@ public class DataInitializer implements CommandLineRunner {
         User seeker = User.builder()
                 .name("Alex Johnson")
                 .email("alex@example.com")
-                .password("12345")
+                .password(passwordEncoder.encode("12345"))
                 .role("seeker")
                 .build();
 
         User recruiter = User.builder()
                 .name("Jane Recruiter")
                 .email("jane@company.com")
-                .password("12345")
+                .password(passwordEncoder.encode("12345"))
                 .role("recruiter")
                 .build();
 
         User admin = User.builder()
                 .name("TalentSync Admin")
                 .email("admin@talentsync.com")
-                .password("admin")
+                .password(passwordEncoder.encode("admin"))
                 .role("admin")
                 .build();
 

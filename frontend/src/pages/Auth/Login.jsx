@@ -13,6 +13,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('expired') === 'true') {
+      setToast({ message: 'Your session has expired. Please sign in again.', type: 'error' });
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {

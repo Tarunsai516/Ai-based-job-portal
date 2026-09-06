@@ -16,14 +16,14 @@ export default function Modal({ isOpen, onClose, title, children }) {
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative bg-white w-full max-w-lg rounded-xl border border-gray-100 shadow-2xl p-6 z-10 flex flex-col max-h-[90vh] overflow-hidden"
+          className="relative bg-white dark:bg-gray-800 w-full max-w-lg rounded-xl border border-gray-100 dark:border-gray-700 shadow-2xl p-6 z-10 flex flex-col max-h-[90vh] overflow-hidden"
         >
           {/* Header */}
-          <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-            <h3 className="text-base font-bold text-gray-905">{title}</h3>
+          <div className="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-gray-700">
+            <h3 className="text-base font-bold text-gray-905 dark:text-gray-100">{title}</h3>
             <button
               onClick={onClose}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-55 transition-colors focus:outline-none"
+              className="p-1 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-55 dark:hover:bg-gray-700 transition-colors focus:outline-none"
             >
               <HiX className="h-5 w-5" />
             </button>

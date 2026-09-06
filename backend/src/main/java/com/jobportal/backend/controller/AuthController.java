@@ -1,11 +1,20 @@
 package com.jobportal.backend.controller;
 
+import com.jobportal.backend.dto.JwtResponse;
 import com.jobportal.backend.model.User;
 import com.jobportal.backend.repository.UserRepository;
+import com.jobportal.backend.security.CustomUserDetails;
+import com.jobportal.backend.security.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -14,22 +23,51 @@ import java.util.Optional;
 public class AuthController {
 
     @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder encoder;
+
+    @Autowired
+    private JwtUtils jwtUtils;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Email already exists"));
         }
+
+        String rawPassword = user.getPassword();
+        user.setPassword(encoder.encode(rawPassword));
         User savedUser = userRepository.save(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
+
+        String jwt = jwtUtils.generateTokenFromEmail(
+                savedUser.getEmail(),
+                savedUser.getId(),
+                savedUser.getName(),
+                savedUser.getRole()
+        );
+
+        JwtResponse jwtResponse = JwtResponse.builder()
+                .token(jwt)
+                .type("Bearer")
+                .id(savedUser.getId())
+                .name(savedUser.getName())
+                .email(savedUser.getEmail())
+                .role(savedUser.getRole())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(jwtResponse);
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         String email = credentials.get("email");
         String password = credentials.get("password");
-        String role = credentials.get("role");
+        String requestedRole = credentials.get("role");
 
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isEmpty()) {
@@ -37,14 +75,32 @@ public class AuthController {
         }
 
         User user = userOpt.get();
-        if (!user.getPassword().equals(password)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid email or password"));
-        }
-
-        if (role != null && !user.getRole().equals(role)) {
+        if (requestedRole != null && !requestedRole.isEmpty() && !user.getRole().equalsIgnoreCase(requestedRole)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Role mismatch"));
         }
 
-        return ResponseEntity.ok(user);
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, password));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid email or password"));
+        }
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+
+        JwtResponse jwtResponse = JwtResponse.builder()
+                .token(jwt)
+                .type("Bearer")
+                .id(userDetails.getId())
+                .name(userDetails.getName())
+                .email(userDetails.getEmail())
+                .role(userDetails.getRole())
+                .build();
+
+        return ResponseEntity.ok(jwtResponse);
     }
 }
