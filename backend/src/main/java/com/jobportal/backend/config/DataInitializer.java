@@ -2,6 +2,8 @@ package com.jobportal.backend.config;
 
 import com.jobportal.backend.model.*;
 import com.jobportal.backend.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -10,6 +12,8 @@ import java.util.List;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -24,7 +28,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         if (userRepository.count() == 0) {
             seedUsers();
-            System.out.println(">>> Database initialized with default user accounts!");
+            logger.info(">>> Database initialized with default user accounts!");
         }
     }
 

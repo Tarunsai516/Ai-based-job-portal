@@ -8,7 +8,12 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Entity
-@Table(name = "jobs")
+@Table(name = "jobs", indexes = {
+    @Index(name = "idx_job_title", columnList = "title"),
+    @Index(name = "idx_job_location", columnList = "location"),
+    @Index(name = "idx_job_type", columnList = "type"),
+    @Index(name = "idx_job_recruiter_id", columnList = "recruiterId")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
