@@ -23,8 +23,9 @@ export default function EditProfile() {
   const [education, setEducation] = useState('');
 
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    candidateService.getById(candidateId)
+    if (!user) return;
+
+    candidateService.getMyProfile()
       .then(data => {
         setName(data.name || user?.name || '');
         setTitle(data.title || '');

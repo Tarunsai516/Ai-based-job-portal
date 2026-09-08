@@ -11,8 +11,10 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    candidateService.getById(candidateId)
+    if (!user) return;
+
+    setLoading(true);
+    candidateService.getMyProfile()
       .then(data => {
         setProfile(data);
         setLoading(false);

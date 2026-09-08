@@ -10,10 +10,20 @@ export default function MyResume() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const openResume = async () => {
+    if (!profile?.resumeId) return;
+    const blob = await candidateService.downloadResume(profile.resumeId);
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    candidateService.getById(candidateId)
-      .then(data => { setProfile(data); setLoading(false); })
+    if (!user) return;
+
+    setLoading(true);
+    Promise.all([candidateService.getMyProfile(), candidateService.getLatestResume()])
+      .then(([data, resume]) => { setProfile({ ...data, resumeId: resume?.resumeId }); setLoading(false); })
       .catch(() => { setProfile(null); setLoading(false); });
   }, [user]);
 
@@ -70,21 +80,20 @@ export default function MyResume() {
                 </div>
               </div>
               <div className="flex space-x-2 w-full sm:w-auto">
-                <a
-                  href={profile.resumeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={openResume}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold rounded-lg transition-colors"
                 >
                   <HiOutlineEye className="mr-1 h-4 w-4" /> Preview
-                </a>
-                <a
-                  href={profile.resumeUrl}
-                  download
+                </button>
+                <button
+                  type="button"
+                  onClick={openResume}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-semibold rounded-lg transition-colors"
                 >
                   <HiOutlineDownload className="mr-1 h-4 w-4" /> Download
-                </a>
+                </button>
               </div>
             </div>
 

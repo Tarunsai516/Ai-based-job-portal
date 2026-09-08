@@ -31,14 +31,14 @@ export default function CandidateDashboard() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
-    const candidateId = user?.id || '1';
 
     try {
-      const [analyticsData, jobsData, appsData, profileData] = await Promise.all([
+      const profileData = await candidateService.getMyProfile();
+      const candidateId = String(profileData.id);
+      const [analyticsData, jobsData, appsData] = await Promise.all([
         analyticsService.getSeeker(candidateId).catch(() => null),
         jobService.getAll().catch(() => []),
-        applicationService.getByCandidateId(candidateId).catch(() => []),
-        candidateService.getById(candidateId).catch(() => null)
+        applicationService.getByCandidateId(candidateId).catch(() => [])
       ]);
 
       setAnalytics(analyticsData);
@@ -51,7 +51,7 @@ export default function CandidateDashboard() {
       const allJobs = Array.isArray(jobsData) ? jobsData : [];
       
       // Calculate dynamic AI Match score for each job based on candidate's skills
-      const candidateSkills = (profileData?.skills || ['React', 'JavaScript', 'Tailwind CSS']).map(s => s.toLowerCase());
+      const candidateSkills = (profileData?.skills || []).map(s => s.toLowerCase());
       
       const scoredJobs = allJobs.map(job => {
         const reqSkills = (job.skills || []).map(s => s.toLowerCase());
@@ -84,7 +84,7 @@ export default function CandidateDashboard() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: user?.id || '1',
+        candidateId: candidateProfile?.id,
         candidateName: user?.name || 'Candidate',
         matchScore: job.matchScore || 85
       });

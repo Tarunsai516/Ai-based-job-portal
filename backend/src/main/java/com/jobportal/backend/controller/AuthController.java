@@ -1,11 +1,13 @@
 package com.jobportal.backend.controller;
 
 import com.jobportal.backend.dto.JwtResponse;
+import com.jobportal.backend.dto.UserDto;
 import com.jobportal.backend.model.User;
 import com.jobportal.backend.repository.UserRepository;
 import com.jobportal.backend.security.CustomUserDetails;
 import com.jobportal.backend.security.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -34,6 +36,9 @@ public class AuthController {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Value("${app.jwt.expiration-ms:86400000}")
+    private Long jwtExpirationMs;
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
@@ -51,13 +56,18 @@ public class AuthController {
                 savedUser.getRole()
         );
 
+        UserDto userDto = UserDto.fromEntity(savedUser);
+
         JwtResponse jwtResponse = JwtResponse.builder()
                 .token(jwt)
+                .tokenType("Bearer")
                 .type("Bearer")
+                .expiresIn(jwtExpirationMs)
                 .id(savedUser.getId())
                 .name(savedUser.getName())
                 .email(savedUser.getEmail())
                 .role(savedUser.getRole())
+                .user(userDto)
                 .build();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(jwtResponse);
@@ -91,14 +101,23 @@ public class AuthController {
         String jwt = jwtUtils.generateJwtToken(authentication);
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-
-        JwtResponse jwtResponse = JwtResponse.builder()
-                .token(jwt)
-                .type("Bearer")
+        UserDto userDto = UserDto.builder()
                 .id(userDetails.getId())
                 .name(userDetails.getName())
                 .email(userDetails.getEmail())
                 .role(userDetails.getRole())
+                .build();
+
+        JwtResponse jwtResponse = JwtResponse.builder()
+                .token(jwt)
+                .tokenType("Bearer")
+                .type("Bearer")
+                .expiresIn(jwtExpirationMs)
+                .id(userDetails.getId())
+                .name(userDetails.getName())
+                .email(userDetails.getEmail())
+                .role(userDetails.getRole())
+                .user(userDto)
                 .build();
 
         return ResponseEntity.ok(jwtResponse);

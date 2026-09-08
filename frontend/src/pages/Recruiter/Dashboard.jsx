@@ -74,7 +74,7 @@ export default function RecruiterDashboard() {
 
   const handleStatusChange = async (appId, newStatus) => {
     try {
-      // Update application status in real-time UI
+      await applicationService.updateStatus(appId, newStatus);
       setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a));
       setToast({
         message: `Application status updated to "${newStatus}"!`,
@@ -240,6 +240,7 @@ export default function RecruiterDashboard() {
                               }`}
                             >
                               <option value="Applied">Applied</option>
+                              <option value="Reviewing">Reviewing</option>
                               <option value="Shortlisted">Shortlisted</option>
                               <option value="Interviewing">Interviewing</option>
                               <option value="Rejected">Rejected</option>

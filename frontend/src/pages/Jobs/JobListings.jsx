@@ -31,11 +31,12 @@ export default function JobListings() {
       .then((data) => setJobs(data))
       .catch((err) => console.error(err));
 
-    // Load applied jobs from backend (mock candidate ID = 1)
-    applicationService.getByCandidateId('1')
+    // Load applications for the authenticated candidate.
+    if (!user?.id) return;
+    applicationService.getByCandidateId(String(user.id))
       .then((apps) => setAppliedJobs(apps.map(a => a.jobId)))
       .catch((err) => console.error(err));
-  }, []);
+  }, [user]);
 
   const handleApply = async (job) => {
     const stringJobId = job.id.toString();
@@ -47,8 +48,8 @@ export default function JobListings() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: user?.id ? String(user.id) : '1',
-        candidateName: user?.name || 'Alex Johnson',
+        candidateId: String(user.id),
+        candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,
         matchScore: 88

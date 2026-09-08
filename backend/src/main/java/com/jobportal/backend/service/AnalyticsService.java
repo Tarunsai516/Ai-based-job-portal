@@ -4,6 +4,7 @@ import com.jobportal.backend.model.Application;
 import com.jobportal.backend.model.Candidate;
 import com.jobportal.backend.model.Job;
 import com.jobportal.backend.model.User;
+import com.jobportal.backend.model.enums.ApplicationStatus;
 import com.jobportal.backend.repository.ApplicationRepository;
 import com.jobportal.backend.repository.CandidateRepository;
 import com.jobportal.backend.repository.JobRepository;
@@ -12,10 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,8 +38,8 @@ public class AnalyticsService {
         List<Application> myApps = applicationRepository.findByCandidateId(queryId);
 
         long sent = myApps.size();
-        long interviews = myApps.stream().filter(a -> "Interviewing".equalsIgnoreCase(a.getStatus())).count();
-        long shortlisted = myApps.stream().filter(a -> "Shortlisted".equalsIgnoreCase(a.getStatus())).count();
+        long interviews = myApps.stream().filter(a -> a.getStatus() == ApplicationStatus.INTERVIEW_SCHEDULED || a.getStatus() == ApplicationStatus.INTERVIEW_COMPLETED).count();
+        long shortlisted = myApps.stream().filter(a -> a.getStatus() == ApplicationStatus.SHORTLISTED).count();
 
         int profileCompletion = 40;
         Long cId = 1L;
@@ -105,8 +103,8 @@ public class AnalyticsService {
 
         long jobsPosted = allJobs.size();
         long appsReceived = allApps.size();
-        long shortlisted = allApps.stream().filter(a -> "Shortlisted".equalsIgnoreCase(a.getStatus())).count();
-        long interviews = allApps.stream().filter(a -> "Interviewing".equalsIgnoreCase(a.getStatus())).count();
+        long shortlisted = allApps.stream().filter(a -> a.getStatus() == ApplicationStatus.SHORTLISTED).count();
+        long interviews = allApps.stream().filter(a -> a.getStatus() == ApplicationStatus.INTERVIEW_SCHEDULED || a.getStatus() == ApplicationStatus.INTERVIEW_COMPLETED).count();
 
         List<Map<String, Object>> recentApps = allApps.stream()
                 .limit(5)
@@ -117,7 +115,7 @@ public class AnalyticsService {
                     map.put("name", app.getCandidateName() != null ? app.getCandidateName() : "Candidate");
                     map.put("jobTitle", app.getJobTitle() != null ? app.getJobTitle() : "");
                     map.put("matchScore", app.getMatchScore());
-                    map.put("status", app.getStatus() != null ? app.getStatus() : "Applied");
+                    map.put("status", app.getStatusString());
                     map.put("date", app.getAppliedDate() != null ? app.getAppliedDate() : "Recently");
                     return map;
                 })

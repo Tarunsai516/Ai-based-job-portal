@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext();
@@ -19,8 +19,13 @@ function parseJwtExp(token) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const timerRef = useRef(null);
 
   const logout = (expired = false) => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
@@ -30,46 +35,56 @@ export function AuthProvider({ children }) {
   };
 
   const scheduleExpirationTimer = (token) => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     const expMs = parseJwtExp(token);
-    if (!expMs) return null;
+    if (!expMs) return;
 
     const delay = expMs - Date.now();
     if (delay <= 0) {
       logout(true);
-      return null;
+      return;
     }
 
-    const timer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       logout(true);
     }, delay);
-
-    return timer;
   };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token') || (storedUser ? JSON.parse(storedUser)?.token : null);
+    try {
+      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('token') || (storedUser ? JSON.parse(storedUser)?.token : null);
 
-    if (token) {
-      const expMs = parseJwtExp(token);
-      if (expMs && Date.now() >= expMs) {
-        logout(true);
-        setLoading(false);
-        return;
+      if (token) {
+        const expMs = parseJwtExp(token);
+        if (expMs && Date.now() >= expMs) {
+          logout(true);
+          setLoading(false);
+          return;
+        }
       }
+
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (parsedUser?.token) {
+          scheduleExpirationTimer(parsedUser.token);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse stored auth user', e);
+    } finally {
+      setLoading(false);
     }
 
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      if (parsedUser?.token) {
-        const timer = scheduleExpirationTimer(parsedUser.token);
-        return () => {
-          if (timer) clearTimeout(timer);
-        };
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
-    }
-    setLoading(false);
+    };
   }, []);
 
   const login = async (email, password, role) => {
@@ -83,11 +98,9 @@ export function AuthProvider({ children }) {
         localStorage.setItem('token', loggedUser.token);
         scheduleExpirationTimer(loggedUser.token);
       }
-      setLoading(false);
       return loggedUser;
-    } catch (error) {
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 
@@ -102,11 +115,9 @@ export function AuthProvider({ children }) {
         localStorage.setItem('token', newUser.token);
         scheduleExpirationTimer(newUser.token);
       }
-      setLoading(false);
       return newUser;
-    } catch (error) {
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 

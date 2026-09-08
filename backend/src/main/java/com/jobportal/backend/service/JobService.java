@@ -1,10 +1,13 @@
 package com.jobportal.backend.service;
 
+import com.jobportal.backend.common.exception.ForbiddenException;
 import com.jobportal.backend.common.exception.ResourceNotFoundException;
 import com.jobportal.backend.dto.JobRequest;
 import com.jobportal.backend.dto.JobResponse;
 import com.jobportal.backend.model.Job;
 import com.jobportal.backend.repository.JobRepository;
+import com.jobportal.backend.security.CustomUserDetails;
+import com.jobportal.backend.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +53,17 @@ public class JobService {
 
     @Transactional
     public JobResponse createJob(JobRequest request) {
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        String recruiterId = request.getRecruiterId();
+        String recruiterEmail = request.getRecruiterEmail();
+        String recruiterName = request.getRecruiterName();
+
+        if (currentUser != null) {
+            if (recruiterId == null || recruiterId.isEmpty()) recruiterId = String.valueOf(currentUser.getId());
+            if (recruiterEmail == null || recruiterEmail.isEmpty()) recruiterEmail = currentUser.getEmail();
+            if (recruiterName == null || recruiterName.isEmpty()) recruiterName = currentUser.getName();
+        }
+
         logger.info("Creating new job: {} for company: {}", request.getTitle(), request.getCompanyName());
 
         Job job = Job.builder()
@@ -66,9 +80,9 @@ public class JobService {
                 .responsibilities(request.getResponsibilities())
                 .qualifications(request.getQualifications())
                 .benefits(request.getBenefits())
-                .recruiterId(request.getRecruiterId())
-                .recruiterName(request.getRecruiterName())
-                .recruiterEmail(request.getRecruiterEmail())
+                .recruiterId(recruiterId)
+                .recruiterName(recruiterName)
+                .recruiterEmail(recruiterEmail)
                 .postedTime(request.getPostedTime() != null ? request.getPostedTime() : "Just now")
                 .build();
 
@@ -81,6 +95,8 @@ public class JobService {
         logger.info("Updating job ID: {}", id);
         Job job = jobRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found with ID: " + id));
+
+        verifyJobOwnership(job);
 
         if (request.getTitle() != null) job.setTitle(request.getTitle());
         if (request.getLocation() != null) job.setLocation(request.getLocation());
@@ -103,9 +119,25 @@ public class JobService {
     @Transactional
     public void deleteJob(Long id) {
         logger.info("Deleting job ID: {}", id);
-        if (!jobRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Job not found with ID: " + id);
-        }
+        Job job = jobRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found with ID: " + id));
+
+        verifyJobOwnership(job);
+
         jobRepository.deleteById(id);
+    }
+
+    private void verifyJobOwnership(Job job) {
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        if (currentUser == null || SecurityUtils.isCurrentUserAdmin()) {
+            return; // System or Admin access allowed
+        }
+
+        boolean isOwnerEmail = job.getRecruiterEmail() != null && job.getRecruiterEmail().equalsIgnoreCase(currentUser.getEmail());
+        boolean isOwnerId = job.getRecruiterId() != null && job.getRecruiterId().equalsIgnoreCase(String.valueOf(currentUser.getId()));
+
+        if (!isOwnerEmail && !isOwnerId) {
+            throw new ForbiddenException("You do not have permission to modify another recruiter's job posting");
+        }
     }
 }

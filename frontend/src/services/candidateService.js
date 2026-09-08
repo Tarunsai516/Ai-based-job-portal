@@ -1,13 +1,13 @@
 import api from './api';
 
 export const candidateService = {
-  getById: async (id) => {
-    const response = await api.get(`/candidates/${id}`);
+  getMyProfile: async () => {
+    const response = await api.get('/candidates/me');
     return response.data;
   },
 
-  getMyProfile: async () => {
-    const response = await api.get('/candidates/me');
+  getById: async (id) => {
+    const response = await api.get(`/candidates/${id}`);
     return response.data;
   },
 
@@ -21,6 +21,21 @@ export const candidateService = {
     const response = await api.post('/candidates/resume/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  getResume: async (resumeId) => {
+    const response = await api.get(`/resumes/${resumeId}`);
+    return response.data;
+  },
+
+  getLatestResume: async () => {
+    const response = await api.get('/resumes/latest');
+    return response.status === 204 ? null : response.data;
+  },
+
+  downloadResume: async (resumeId) => {
+    const response = await api.get(`/resumes/${resumeId}/file`, { responseType: 'blob' });
     return response.data;
   },
 

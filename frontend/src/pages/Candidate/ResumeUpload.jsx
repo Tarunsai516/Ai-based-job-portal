@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
 import { candidateService } from '../../services/candidateService';
+import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 import { HiCloudUpload, HiDocumentText, HiOutlineSparkles, HiCheckCircle, HiOutlineTrash } from 'react-icons/hi';
 import { motion } from 'framer-motion';
@@ -17,8 +18,8 @@ export default function ResumeUpload() {
 
   // Fetch existing resume info from profile
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    candidateService.getById(candidateId)
+    if (!user) return;
+    candidateService.getMyProfile()
       .then(data => {
         if (data?.resumeUrl) setExistingResume(data.resumeUrl);
       })
@@ -51,30 +52,40 @@ export default function ResumeUpload() {
     setUploading(true);
     setProgress(0);
 
-    // Simulate upload progress UI
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 85) { clearInterval(interval); return 85; }
-        return prev + 15;
-      });
-    }, 200);
-
     try {
       const formData = new FormData();
-      formData.append('resume', file);
+      formData.append('file', file);
 
-      const result = await candidateService.uploadResume(formData);
-      clearInterval(interval);
+      const uploaded = await candidateService.uploadResume(formData);
+      setProgress(50);
+      let result = await candidateService.getResume(uploaded.resumeId);
+      for (let attempt = 0; attempt < 20 && ['UPLOADED', 'PROCESSING'].includes(result.status); attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        result = await candidateService.getResume(uploaded.resumeId);
+      }
+
+      if (result.status === 'FAILED') {
+        throw new Error(result.errorMessage || 'Resume processing failed');
+      }
+
+      const parsedData = result.parsedData || {};
+      const matches = await recommendationService.getForCandidate(String(uploaded.candidateId));
+      const bestMatch = matches?.content?.[0];
       setProgress(100);
       setUploading(false);
-      setParsedResult(result);
-      setExistingResume(result?.resumeUrl || file.name);
+      setParsedResult({
+        ...parsedData,
+        resumeId: result.resumeId,
+        status: result.status,
+        compatibilityScore: bestMatch?.overallScore ?? null,
+        bestMatchExplanation: bestMatch?.explanation ?? null,
+      });
+      setExistingResume(result.filename || file.name);
       setToast({ message: 'Resume uploaded and parsed by AI successfully!', type: 'success' });
     } catch (err) {
-      clearInterval(interval);
       setProgress(0);
       setUploading(false);
-      setToast({ message: 'Upload failed. Please try again.', type: 'error' });
+      setToast({ message: err.message || 'Upload failed. Please try again.', type: 'error' });
     }
   };
 
@@ -177,12 +188,16 @@ export default function ResumeUpload() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Experience</p>
-                <p className="text-lg font-black text-gray-800 mt-1">{parsedResult.experience || 'N/A'}</p>
+                <p className="text-lg font-black text-gray-800 mt-1">
+                  {parsedResult.estimatedYearsOfExperience ? `${parsedResult.estimatedYearsOfExperience} years` : 'N/A'}
+                </p>
               </div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Match Score</p>
                 <p className="text-lg font-black text-emerald-600 mt-1">
-                  {parsedResult.compatibilityScore != null ? `${parsedResult.compatibilityScore}%` : '—'}
+                  {parsedResult.compatibilityScore != null
+                    ? `${Math.round(parsedResult.compatibilityScore)}%`
+                    : 'No jobs yet'}
                 </p>
               </div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
@@ -204,25 +219,17 @@ export default function ResumeUpload() {
               </div>
             )}
 
-            {parsedResult.suggestedRoles?.length > 0 && (
+            {parsedResult.summary && (
               <div className="space-y-2 pt-4 border-t border-gray-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Recommended Roles</span>
-                <div className="space-y-2">
-                  {parsedResult.suggestedRoles.map((role) => (
-                    <div key={role} className="flex items-center space-x-2 text-xs text-gray-700">
-                      <HiCheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0" />
-                      <span className="font-medium">{role}</span>
-                    </div>
-                  ))}
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">AI Summary</span>
+                <p className="text-xs text-gray-600 leading-relaxed">{parsedResult.summary}</p>
               </div>
             )}
 
-            {parsedResult.analysisNotes && (
-              <div className="pt-4 border-t border-gray-100">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">AI Analysis</span>
-                <p className="text-xs text-gray-600 mt-2 leading-relaxed">{parsedResult.analysisNotes}</p>
-              </div>
+            {parsedResult.bestMatchExplanation && (
+              <p className="text-xs text-gray-500 border-t border-gray-100 pt-4">
+                Best match explanation: {parsedResult.bestMatchExplanation}
+              </p>
             )}
           </motion.div>
         )}

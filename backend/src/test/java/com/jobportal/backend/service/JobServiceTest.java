@@ -79,7 +79,7 @@ class JobServiceTest {
 
     @Test
     void deleteJob_notFound_throwsResourceNotFoundException() {
-        when(jobRepository.existsById(99L)).thenReturn(false);
+        when(jobRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> jobService.deleteJob(99L));
     }

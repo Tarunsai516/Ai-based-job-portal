@@ -4,12 +4,14 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
+import { useAuth } from '../../context/AuthContext';
 import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [toast, setToast] = useState(null);
   const [applied, setApplied] = useState(false);
   const [job, setJob] = useState(null);
@@ -27,14 +29,16 @@ export default function JobDetails() {
         setLoading(false);
       });
 
-    // Check if already applied (mock candidate ID = 1)
-    applicationService.getByCandidateId('1')
+    if (!user?.id) return;
+
+    // Check if the authenticated candidate already applied.
+    applicationService.getByCandidateId(String(user.id))
       .then((apps) => {
         const hasApplied = apps.some((app) => app.jobId === id.toString());
         setApplied(hasApplied);
       })
       .catch((err) => console.error(err));
-  }, [id]);
+  }, [id, user]);
 
   if (loading) {
     return (
@@ -66,8 +70,8 @@ export default function JobDetails() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: user?.id ? String(user.id) : '1',
-        candidateName: user?.name || 'Alex Johnson',
+        candidateId: String(user.id),
+        candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,
         matchScore: 88

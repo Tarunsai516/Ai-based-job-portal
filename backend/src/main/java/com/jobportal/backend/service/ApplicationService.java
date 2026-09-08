@@ -2,12 +2,18 @@ package com.jobportal.backend.service;
 
 import com.jobportal.backend.common.exception.BadRequestException;
 import com.jobportal.backend.common.exception.DuplicateResourceException;
+import com.jobportal.backend.common.exception.ForbiddenException;
 import com.jobportal.backend.dto.ApplicationRequest;
 import com.jobportal.backend.dto.ApplicationResponse;
 import com.jobportal.backend.model.Application;
 import com.jobportal.backend.model.Job;
+import com.jobportal.backend.model.MatchResult;
+import com.jobportal.backend.model.enums.ApplicationStatus;
+import com.jobportal.backend.model.enums.AuditAction;
 import com.jobportal.backend.repository.ApplicationRepository;
 import com.jobportal.backend.repository.JobRepository;
+import com.jobportal.backend.security.CustomUserDetails;
+import com.jobportal.backend.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +35,15 @@ public class ApplicationService {
 
     @Autowired
     private JobRepository jobRepository;
+
+    @Autowired
+    private MatchingService matchingService;
+
+    @Autowired
+    private AuditService auditService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<ApplicationResponse> getApplications(String candidateId, String recruiterId, String recruiterEmail) {
@@ -73,6 +88,8 @@ public class ApplicationService {
         String companyName = request.getCompanyName();
         String jobTitle = request.getJobTitle();
 
+        // Calculate real match score
+        int calculatedMatchScore = 0;
         try {
             Long jobIdNum = Long.parseLong(request.getJobId());
             Optional<Job> targetJobOpt = jobRepository.findById(jobIdNum);
@@ -82,6 +99,15 @@ public class ApplicationService {
                 if (recruiterEmail == null || recruiterEmail.isEmpty()) recruiterEmail = targetJob.getRecruiterEmail();
                 if (companyName == null || companyName.isEmpty()) companyName = targetJob.getCompanyName();
                 if (jobTitle == null || jobTitle.isEmpty()) jobTitle = targetJob.getTitle();
+
+                // Calculate REAL match score using the matching engine
+                try {
+                    Long candidateIdNum = Long.parseLong(request.getCandidateId());
+                    MatchResult match = matchingService.calculateMatch(candidateIdNum, jobIdNum);
+                    calculatedMatchScore = (int) Math.round(match.getOverallScore());
+                } catch (Exception e) {
+                    logger.warn("Match calculation failed, using 0: {}", e.getMessage());
+                }
             }
         } catch (NumberFormatException ignored) {}
 
@@ -89,9 +115,9 @@ public class ApplicationService {
                 .jobId(request.getJobId())
                 .jobTitle(jobTitle)
                 .companyName(companyName)
-                .status(request.getStatus() != null ? request.getStatus() : "Applied")
+                .status(ApplicationStatus.APPLIED)
                 .appliedDate(request.getAppliedDate() != null ? request.getAppliedDate() : LocalDate.now().toString())
-                .matchScore(request.getMatchScore() != 0 ? request.getMatchScore() : 85)
+                .matchScore(calculatedMatchScore)
                 .candidateId(request.getCandidateId())
                 .candidateName(request.getCandidateName())
                 .recruiterId(recruiterId)
@@ -99,6 +125,79 @@ public class ApplicationService {
                 .build();
 
         Application savedApp = applicationRepository.save(application);
+
+        auditService.log(AuditAction.APPLICATION_CREATED, "Application",
+                String.valueOf(savedApp.getId()),
+                "Job: " + jobTitle + ", Candidate: " + request.getCandidateName());
+
+        // Notify recruiter
+        if (recruiterId != null) {
+            try {
+                notificationService.createNotification(
+                        Long.parseLong(recruiterId),
+                        "recruiter",
+                        "New Application",
+                        request.getCandidateName() + " applied for " + jobTitle,
+                        "APPLICATION"
+                );
+            } catch (NumberFormatException ignored) {}
+        }
+
         return ApplicationResponse.fromEntity(savedApp);
+    }
+
+    /**
+     * Update application status with state machine validation.
+     * Backend enforces valid transitions — frontend cannot set arbitrary statuses.
+     */
+    @Transactional
+    public ApplicationResponse updateApplicationStatus(Long applicationId, String newStatusStr) {
+        Application application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new BadRequestException("Application not found: " + applicationId));
+
+        ApplicationStatus currentStatus = application.getStatus();
+        if (currentStatus == null) currentStatus = ApplicationStatus.APPLIED;
+
+        ApplicationStatus newStatus = Application.parseStatus(newStatusStr);
+
+        // Validate state transition
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            throw new BadRequestException(
+                    "Invalid status transition: " + currentStatus + " → " + newStatus +
+                    ". Allowed transitions from " + currentStatus + ": " +
+                    getValidTransitions(currentStatus)
+            );
+        }
+
+        application.setStatus(newStatus);
+        Application saved = applicationRepository.save(application);
+
+        auditService.log(AuditAction.APPLICATION_STATUS_CHANGED, "Application",
+                String.valueOf(applicationId),
+                "Status: " + currentStatus + " → " + newStatus);
+
+        // Notify candidate
+        if (application.getCandidateId() != null) {
+            try {
+                notificationService.createNotification(
+                        Long.parseLong(application.getCandidateId()),
+                        "seeker",
+                        "Application Update",
+                        "Your application for " + application.getJobTitle() + " status changed to " +
+                                application.getStatusString(),
+                        "APPLICATION"
+                );
+            } catch (NumberFormatException ignored) {}
+        }
+
+        return ApplicationResponse.fromEntity(saved);
+    }
+
+    private String getValidTransitions(ApplicationStatus status) {
+        List<String> valid = new java.util.ArrayList<>();
+        for (ApplicationStatus target : ApplicationStatus.values()) {
+            if (status.canTransitionTo(target)) valid.add(target.name());
+        }
+        return String.join(", ", valid);
     }
 }

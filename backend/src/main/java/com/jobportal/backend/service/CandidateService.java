@@ -1,10 +1,14 @@
 package com.jobportal.backend.service;
 
 import com.jobportal.backend.common.exception.BadRequestException;
+import com.jobportal.backend.common.exception.ForbiddenException;
 import com.jobportal.backend.common.exception.ResourceNotFoundException;
 import com.jobportal.backend.dto.CandidateDto;
 import com.jobportal.backend.model.Candidate;
+import com.jobportal.backend.model.Resume;
 import com.jobportal.backend.repository.CandidateRepository;
+import com.jobportal.backend.security.CustomUserDetails;
+import com.jobportal.backend.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +29,9 @@ public class CandidateService {
     @Autowired
     private CandidateRepository candidateRepository;
 
+    @Autowired
+    private ResumeService resumeService;
+
     @Transactional(readOnly = true)
     public List<CandidateDto> getAllCandidates() {
         return candidateRepository.findAll().stream()
@@ -32,17 +39,40 @@ public class CandidateService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Get current user's candidate profile (user-aware, not hardcoded to ID=1).
+     */
+    @Transactional
     public CandidateDto getMyProfile() {
-        Optional<Candidate> candidateOpt = candidateRepository.findById(1L);
-        if (candidateOpt.isEmpty()) {
-            List<Candidate> all = candidateRepository.findAll();
-            if (!all.isEmpty()) {
-                return CandidateDto.fromEntity(all.get(0));
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+
+        if (currentUser != null) {
+            // Try finding by userId first
+            Optional<Candidate> byUser = candidateRepository.findByUserId(currentUser.getId());
+            if (byUser.isPresent())
+                return CandidateDto.fromEntity(byUser.get());
+
+            // Try finding by email
+            Optional<Candidate> byEmail = candidateRepository.findByEmail(currentUser.getEmail());
+            if (byEmail.isPresent()) {
+                // Link the candidate to the user
+                Candidate c = byEmail.get();
+                c.setUserId(currentUser.getId());
+                candidateRepository.save(c);
+                return CandidateDto.fromEntity(c);
             }
-            throw new ResourceNotFoundException("Candidate profile not found");
+
+            // Auto-create a candidate profile for this user
+            Candidate newCandidate = Candidate.builder()
+                    .userId(currentUser.getId())
+                    .name(currentUser.getName())
+                    .email(currentUser.getEmail())
+                    .build();
+            candidateRepository.save(newCandidate);
+            return CandidateDto.fromEntity(newCandidate);
         }
-        return CandidateDto.fromEntity(candidateOpt.get());
+
+        throw new ForbiddenException("Authentication is required to access a candidate profile");
     }
 
     @Transactional(readOnly = true)
@@ -55,53 +85,92 @@ public class CandidateService {
     @Transactional
     public CandidateDto updateProfile(CandidateDto dto) {
         logger.info("Updating candidate profile");
-        Optional<Candidate> candidateOpt = candidateRepository.findById(1L);
-        Candidate candidate = candidateOpt.orElseGet(Candidate::new);
 
-        if (dto.getName() != null) candidate.setName(dto.getName());
-        if (dto.getTitle() != null) candidate.setTitle(dto.getTitle());
-        if (dto.getLocation() != null) candidate.setLocation(dto.getLocation());
-        if (dto.getEmail() != null) candidate.setEmail(dto.getEmail());
-        if (dto.getPhone() != null) candidate.setPhone(dto.getPhone());
-        if (dto.getSummary() != null) candidate.setSummary(dto.getSummary());
-        if (dto.getSkills() != null) candidate.setSkills(dto.getSkills());
-        if (dto.getMissingSkills() != null) candidate.setMissingSkills(dto.getMissingSkills());
-        if (dto.getExperience() != null) candidate.setExperience(dto.getExperience());
-        if (dto.getEducation() != null) candidate.setEducation(dto.getEducation());
+        // Find the candidate for the current user
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        Candidate candidate = null;
+
+        if (currentUser != null) {
+            candidate = candidateRepository.findByUserId(currentUser.getId()).orElse(null);
+            if (candidate == null) {
+                candidate = candidateRepository.findByEmail(currentUser.getEmail()).orElse(null);
+            }
+        }
+
+        if (candidate == null) {
+            throw new ForbiddenException("Authentication is required to update a candidate profile");
+        }
+
+        if (dto.getName() != null)
+            candidate.setName(dto.getName());
+        if (dto.getTitle() != null)
+            candidate.setTitle(dto.getTitle());
+        if (dto.getLocation() != null)
+            candidate.setLocation(dto.getLocation());
+        if (dto.getEmail() != null)
+            candidate.setEmail(dto.getEmail());
+        if (dto.getPhone() != null)
+            candidate.setPhone(dto.getPhone());
+        if (dto.getSummary() != null)
+            candidate.setSummary(dto.getSummary());
+        if (dto.getSkills() != null)
+            candidate.setSkills(dto.getSkills());
+        if (dto.getMissingSkills() != null)
+            candidate.setMissingSkills(dto.getMissingSkills());
+        if (dto.getExperience() != null)
+            candidate.setExperience(dto.getExperience());
+        if (dto.getEducation() != null)
+            candidate.setEducation(dto.getEducation());
+
+        if (currentUser != null && candidate.getUserId() == null) {
+            candidate.setUserId(currentUser.getId());
+        }
 
         Candidate saved = candidateRepository.save(candidate);
         return CandidateDto.fromEntity(saved);
     }
 
+    /**
+     * Upload and process resume using the ResumeService pipeline.
+     * Returns processing status and resume info — no more fake hardcoded results.
+     */
     @Transactional
     public Map<String, Object> uploadResume(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Uploaded file is empty");
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        Long userId = currentUser != null ? currentUser.getId() : null;
+
+        // Find or create candidate
+        Candidate candidate = null;
+        if (currentUser != null) {
+            candidate = candidateRepository.findByUserId(currentUser.getId()).orElse(null);
+            if (candidate == null) {
+                candidate = candidateRepository.findByEmail(currentUser.getEmail()).orElse(null);
+            }
+            if (candidate == null) {
+                candidate = Candidate.builder()
+                        .userId(currentUser.getId())
+                        .name(currentUser.getName())
+                        .email(currentUser.getEmail())
+                        .build();
+                candidate = candidateRepository.save(candidate);
+            }
+        } else {
+            throw new ForbiddenException("Authentication is required to upload a resume");
         }
 
-        String filename = file.getOriginalFilename();
-        if (filename == null || (!filename.endsWith(".pdf") && !filename.endsWith(".docx"))) {
-            throw new BadRequestException("Invalid file format. PDF or DOCX only.");
-        }
+        // Upload and trigger async processing
+        Resume resume = resumeService.uploadResume(file, candidate.getId(), userId);
 
-        logger.info("Processing resume upload: {}", filename);
+        // Update candidate's resume URL
+        candidate.setResumeUrl(resume.getOriginalFileName());
+        candidateRepository.save(candidate);
 
-        Map<String, Object> mockParsedResult = Map.of(
-            "filename", filename,
-            "size", (double) file.getSize() / 1024 / 1024,
-            "experience", "5.5 Years",
-            "compatibilityScore", 92,
-            "matchScore", 92,
-            "skills", List.of("React", "JavaScript", "Tailwind CSS", "Next.js", "Redux", "Git"),
-            "suggestedRoles", List.of("Senior React Developer", "Frontend Engineer", "UI/UX Developer"),
-            "resumeUrl", filename
-        );
-
-        candidateRepository.findById(1L).ifPresent(c -> {
-            c.setResumeUrl(filename);
-            candidateRepository.save(c);
-        });
-
-        return mockParsedResult;
+        return Map.of(
+                "resumeId", resume.getId(),
+                "candidateId", candidate.getId(),
+                "filename", resume.getOriginalFileName(),
+                "size", (double) resume.getFileSize() / 1024 / 1024,
+                "status", resume.getStatus().name(),
+                "message", "Resume uploaded successfully. Processing in background.");
     }
 }

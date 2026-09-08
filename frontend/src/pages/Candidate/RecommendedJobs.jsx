@@ -5,6 +5,7 @@ import EmptyState from '../../components/common/EmptyState';
 import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
+import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 import { HiOutlineSparkles } from 'react-icons/hi';
 
@@ -14,17 +15,34 @@ export default function RecommendedJobs() {
   const [jobs, setJobs] = useState([]);
   const [appliedJobIds, setAppliedJobIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [candidateId, setCandidateId] = useState(null);
 
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    Promise.all([
-      jobService.getAll().catch(() => []),
-      applicationService.getByCandidateId(candidateId).catch(() => [])
-    ]).then(([allJobs, myApps]) => {
-      setJobs(Array.isArray(allJobs) ? allJobs : []);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    candidateService.getMyProfile().then(profile => {
+      const resolvedCandidateId = String(profile.id);
+      setCandidateId(resolvedCandidateId);
+      return Promise.all([
+        recommendationService.getForCandidate(resolvedCandidateId).catch(() => ({ content: [] })),
+        jobService.getAll().catch(() => []),
+        applicationService.getByCandidateId(resolvedCandidateId).catch(() => [])
+      ]);
+    }).then(([matchPage, allJobs, myApps]) => {
+      const jobsById = new Map((Array.isArray(allJobs) ? allJobs : []).map(job => [String(job.id), job]));
+      const matchedJobs = (matchPage?.content || [])
+        .map(match => {
+          const job = jobsById.get(String(match.jobId));
+          return job ? { ...job, matchScore: match.overallScore, matchExplanation: match.explanation } : null;
+        })
+        .filter(Boolean);
+      setJobs(matchedJobs);
       setAppliedJobIds((Array.isArray(myApps) ? myApps : []).map(a => a.jobId));
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [user]);
 
   const handleApply = async (job) => {
@@ -32,7 +50,7 @@ export default function RecommendedJobs() {
     try {
       await applicationService.apply({
         jobId: job.id,
-        candidateId: user?.id,
+        candidateId,
         jobTitle: job.title,
         companyName: job.companyName,
       });
