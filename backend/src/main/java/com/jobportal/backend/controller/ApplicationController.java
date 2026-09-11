@@ -34,6 +34,10 @@ public class ApplicationController {
         CustomUserDetails currentUser = requireUser();
         if ("SEEKER".equalsIgnoreCase(currentUser.getRole())) {
             candidateId = String.valueOf(getCurrentCandidateId(currentUser));
+        } else if ("RECRUITER".equalsIgnoreCase(currentUser.getRole())) {
+            recruiterId = String.valueOf(currentUser.getId());
+            candidateId = null;
+            recruiterEmail = null;
         }
         return ResponseEntity.ok(applicationService.getApplications(candidateId, recruiterId, recruiterEmail));
     }

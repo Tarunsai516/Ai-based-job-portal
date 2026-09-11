@@ -75,7 +75,7 @@ export default function CandidateCard({ candidate }) {
 
       <div className="mt-6 pt-4 border-t border-gray-100">
         <Link
-          to={`/recruiter/candidates/${candidate.id}`}
+          to={`/recruiter/candidates/${candidate.id}?applicationId=${candidate.applicationId || ''}`}
           className="block w-full text-center py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
         >
           Evaluate Candidate & Match Score

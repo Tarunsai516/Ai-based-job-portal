@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
 import { candidateService } from '../../services/candidateService';
+import { applicationService } from '../../services/applicationService';
+import { interviewService } from '../../services/interviewService';
 import { HiOutlineChevronLeft, HiOutlineMail, HiOutlinePhone, HiOutlineLocationMarker, HiCheckCircle, HiOutlineDownload } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function CandidateDetails() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
-  const [status, setStatus] = useState('Pending'); 
+  const [status, setStatus] = useState('Applied');
+  const [application, setApplication] = useState(null);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [scheduling, setScheduling] = useState(false);
   const [candidate, setCandidate] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,13 +28,22 @@ export default function CandidateDetails() {
     candidateService.getById(queryId)
       .then((data) => {
         setCandidate(data);
+        return applicationService.getByCandidateId(data.id);
+      })
+      .then((applications) => {
+        const requestedApplicationId = searchParams.get('applicationId');
+        const candidateApplication = Array.isArray(applications)
+          ? applications.find(app => String(app.id) === requestedApplicationId) || applications[0]
+          : null;
+        setApplication(candidateApplication);
+        if (candidateApplication?.status) setStatus(candidateApplication.status);
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
         setLoading(false);
       });
-  }, [id]);
+  }, [id, searchParams]);
 
   if (loading) {
     return (
@@ -47,20 +63,44 @@ export default function CandidateDetails() {
     );
   }
 
-  const handleShortlist = () => {
-    setStatus('Shortlisted');
-    setToast({
-      message: `${candidate.name} has been successfully Shortlisted!`,
-      type: 'success'
-    });
+  const handleShortlist = async () => {
+    if (!application) return;
+    try {
+      let updated = application;
+      if (updated.status === 'Applied') {
+        updated = await applicationService.updateStatus(application.id, 'Reviewing');
+      }
+      updated = await applicationService.updateStatus(application.id, 'Shortlisted');
+      setApplication(updated);
+      setStatus(updated.status);
+      setToast({ message: `${candidate.name} has been successfully shortlisted!`, type: 'success' });
+    } catch (error) {
+      setToast({ message: error.response?.data?.message || 'Unable to shortlist candidate.', type: 'error' });
+    }
   };
 
-  const handleInterview = () => {
-    setStatus('Interview Scheduled');
-    setToast({
-      message: `Interview session scheduled with ${candidate.name}! Invitation email sent.`,
-      type: 'success'
-    });
+  const handleInterview = async () => {
+    if (!application || !scheduledAt) {
+      setToast({ message: 'Choose an interview date and time first.', type: 'error' });
+      return;
+    }
+    setScheduling(true);
+    try {
+      const interview = await interviewService.schedule({
+        applicationId: application.id,
+        scheduledAt: new Date(scheduledAt).toISOString().slice(0, 19),
+        durationMinutes: 60,
+        type: 'TECHNICAL',
+        meetingLink: meetingLink || null,
+      });
+      setStatus('Interviewing');
+      setToast({ message: `Interview scheduled with ${candidate.name}.`, type: 'success' });
+      setScheduling(false);
+      return interview;
+    } catch (error) {
+      setScheduling(false);
+      setToast({ message: error.response?.data?.message || 'Unable to schedule interview.', type: 'error' });
+    }
   };
 
   return (
@@ -106,27 +146,44 @@ export default function CandidateDetails() {
           <div className="flex space-x-3 w-full md:w-auto">
             <button
               onClick={handleShortlist}
-              disabled={status !== 'Pending'}
+              disabled={!application || ['Shortlisted', 'Interviewing', 'Interview Completed', 'Selected'].includes(status)}
               className={`flex-1 md:flex-none px-4 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-colors border ${
-                status !== 'Pending'
+                ['Shortlisted', 'Interviewing', 'Interview Completed', 'Selected'].includes(status)
                   ? 'bg-gray-105 border-gray-200 text-gray-450 cursor-not-allowed'
                   : 'bg-white border-blue-200 hover:bg-blue-50 text-blue-600'
               }`}
             >
-              {status === 'Pending' ? 'Shortlist' : 'Shortlisted'}
+              {status === 'Shortlisted' || ['Interviewing', 'Interview Completed', 'Selected'].includes(status) ? 'Shortlisted' : 'Shortlist'}
             </button>
             <button
               onClick={handleInterview}
-              disabled={status === 'Interview Scheduled'}
+              disabled={!application || scheduling || ['Interviewing', 'Interview Completed', 'Selected'].includes(status)}
               className={`flex-1 md:flex-none px-5 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-colors ${
-                status === 'Interview Scheduled'
+                scheduling || ['Interviewing', 'Interview Completed', 'Selected'].includes(status)
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                   : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
-              {status === 'Interview Scheduled' ? 'Interview Scheduled' : 'Schedule Interview'}
+              {scheduling ? 'Scheduling...' : ['Interviewing', 'Interview Completed', 'Selected'].includes(status) ? 'Interview Scheduled' : 'Schedule Interview'}
             </button>
           </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-bold text-gray-900">Interview Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="text-xs font-semibold text-gray-700">
+              Date and time
+              <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-xs" />
+            </label>
+            <label className="text-xs font-semibold text-gray-700">
+              Meeting link
+              <input type="url" value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} placeholder="https://..."
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-xs" />
+            </label>
+          </div>
+          {!application && <p className="text-xs text-amber-600">No application was found for this candidate.</p>}
         </div>
 
         {/* Evaluation and Match details */}

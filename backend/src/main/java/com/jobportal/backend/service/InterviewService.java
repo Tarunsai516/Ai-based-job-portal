@@ -6,7 +6,10 @@ import com.jobportal.backend.model.Application;
 import com.jobportal.backend.model.Interview;
 import com.jobportal.backend.model.enums.*;
 import com.jobportal.backend.repository.ApplicationRepository;
+import com.jobportal.backend.repository.CandidateRepository;
 import com.jobportal.backend.repository.InterviewRepository;
+import com.jobportal.backend.security.CustomUserDetails;
+import com.jobportal.backend.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +34,9 @@ public class InterviewService {
     private ApplicationRepository applicationRepository;
 
     @Autowired
+    private CandidateRepository candidateRepository;
+
+    @Autowired
     private AuditService auditService;
 
     @Autowired
@@ -41,11 +47,19 @@ public class InterviewService {
      */
     @Transactional
     public Interview scheduleInterview(Long applicationId, LocalDateTime scheduledAt,
-                                        int durationMinutes, InterviewType type,
-                                        String meetingLink, String notes,
-                                        Long recruiterId) {
+            int durationMinutes, InterviewType type,
+            String meetingLink, String notes,
+            Long recruiterId) {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
+
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        if (currentUser == null || !"RECRUITER".equalsIgnoreCase(currentUser.getRole())
+                || application.getRecruiterId() == null
+                || !application.getRecruiterId().equals(String.valueOf(currentUser.getId()))) {
+            throw new com.jobportal.backend.common.exception.ForbiddenException(
+                    "Only the job's recruiter can schedule this interview");
+        }
 
         // Validate state transition
         ApplicationStatus current = application.getStatus();
@@ -61,12 +75,14 @@ public class InterviewService {
         Long candidateId = null;
         try {
             candidateId = Long.parseLong(application.getCandidateId());
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         Long jobId = null;
         try {
             jobId = Long.parseLong(application.getJobId());
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         Interview interview = Interview.builder()
                 .applicationId(applicationId)
@@ -92,8 +108,7 @@ public class InterviewService {
                     "Your interview for " + application.getJobTitle() + " at " +
                             application.getCompanyName() + " has been scheduled for " +
                             scheduledAt.toString(),
-                    "INTERVIEW"
-            );
+                    "INTERVIEW");
         }
 
         auditService.log(AuditAction.INTERVIEW_SCHEDULED, "Interview",
@@ -111,7 +126,8 @@ public class InterviewService {
 
         interview.setStatus(newStatus);
         interview.setUpdatedAt(LocalDateTime.now());
-        if (feedback != null) interview.setFeedback(feedback);
+        if (feedback != null)
+            interview.setFeedback(feedback);
 
         // If completed, update application status
         if (newStatus == InterviewStatus.COMPLETED) {
@@ -131,6 +147,16 @@ public class InterviewService {
 
     @Transactional(readOnly = true)
     public List<Interview> getInterviewsByCandidate(Long candidateId) {
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        boolean isAdmin = currentUser != null && "ADMIN".equalsIgnoreCase(currentUser.getRole());
+        boolean ownsCandidate = currentUser != null && candidateRepository.findByUserId(currentUser.getId())
+                .or(() -> candidateRepository.findByEmail(currentUser.getEmail()))
+                .map(candidate -> candidateId.equals(candidate.getId()))
+                .orElse(false);
+        if (!isAdmin && !ownsCandidate) {
+            throw new com.jobportal.backend.common.exception.ForbiddenException(
+                    "You can only access your own interviews");
+        }
         return interviewRepository.findByCandidateId(candidateId);
     }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { applicationService } from '../../services/applicationService';
 import { candidateService } from '../../services/candidateService';
+import { interviewService } from '../../services/interviewService';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/common/EmptyState';
 import { HiOutlineCheck, HiOutlineClock } from 'react-icons/hi';
@@ -36,14 +37,19 @@ export default function ApplicationStatus() {
   const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     candidateService.getMyProfile()
-      .then(profile => applicationService.getByCandidateId(profile.id))
-      .then(data => {
+      .then(profile => Promise.all([
+        applicationService.getByCandidateId(profile.id),
+        interviewService.getByCandidate(profile.id).catch(() => [])
+      ]))
+      .then(([data, interviewData]) => {
         setApplications(Array.isArray(data) ? data : []);
+        setInterviews(Array.isArray(interviewData) ? interviewData : []);
         setLoading(false);
       })
       .catch(() => {
@@ -54,6 +60,9 @@ export default function ApplicationStatus() {
 
   const activeApp = applications[selectedIdx] || null;
   const stages = activeApp ? buildStages(activeApp.status) : [];
+  const activeInterviews = activeApp
+    ? interviews.filter(interview => interview.applicationId === activeApp.id)
+    : [];
 
   return (
     <DashboardLayout>
@@ -143,6 +152,22 @@ export default function ApplicationStatus() {
                       </div>
                     ))}
                   </div>
+
+                  {activeInterviews.length > 0 && (
+                    <div className="border-t border-gray-100 pt-5 space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Interview Details</h4>
+                      {activeInterviews.map(interview => (
+                        <div key={interview.id} className="bg-purple-50 border border-purple-100 rounded-lg p-4 text-xs text-gray-700 space-y-1">
+                          <p><span className="font-bold">When:</span> {new Date(interview.scheduledAt).toLocaleString()}</p>
+                          <p><span className="font-bold">Type:</span> {interview.type}</p>
+                          {interview.meetingLink && (
+                            <p><span className="font-bold">Meeting:</span> <a className="text-blue-600 hover:underline" href={interview.meetingLink} target="_blank" rel="noreferrer">Join interview</a></p>
+                          )}
+                          {interview.notes && <p><span className="font-bold">Notes:</span> {interview.notes}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-6 text-xs text-gray-500">Select an application to view its status.</div>

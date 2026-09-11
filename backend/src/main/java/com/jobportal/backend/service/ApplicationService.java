@@ -95,10 +95,14 @@ public class ApplicationService {
             Optional<Job> targetJobOpt = jobRepository.findById(jobIdNum);
             if (targetJobOpt.isPresent()) {
                 Job targetJob = targetJobOpt.get();
-                if (recruiterId == null || recruiterId.isEmpty()) recruiterId = targetJob.getRecruiterId();
-                if (recruiterEmail == null || recruiterEmail.isEmpty()) recruiterEmail = targetJob.getRecruiterEmail();
-                if (companyName == null || companyName.isEmpty()) companyName = targetJob.getCompanyName();
-                if (jobTitle == null || jobTitle.isEmpty()) jobTitle = targetJob.getTitle();
+                if (recruiterId == null || recruiterId.isEmpty())
+                    recruiterId = targetJob.getRecruiterId();
+                if (recruiterEmail == null || recruiterEmail.isEmpty())
+                    recruiterEmail = targetJob.getRecruiterEmail();
+                if (companyName == null || companyName.isEmpty())
+                    companyName = targetJob.getCompanyName();
+                if (jobTitle == null || jobTitle.isEmpty())
+                    jobTitle = targetJob.getTitle();
 
                 // Calculate REAL match score using the matching engine
                 try {
@@ -109,7 +113,8 @@ public class ApplicationService {
                     logger.warn("Match calculation failed, using 0: {}", e.getMessage());
                 }
             }
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         Application application = Application.builder()
                 .jobId(request.getJobId())
@@ -138,9 +143,9 @@ public class ApplicationService {
                         "recruiter",
                         "New Application",
                         request.getCandidateName() + " applied for " + jobTitle,
-                        "APPLICATION"
-                );
-            } catch (NumberFormatException ignored) {}
+                        "APPLICATION");
+            } catch (NumberFormatException ignored) {
+            }
         }
 
         return ApplicationResponse.fromEntity(savedApp);
@@ -155,8 +160,17 @@ public class ApplicationService {
         Application application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BadRequestException("Application not found: " + applicationId));
 
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        boolean isAdmin = currentUser != null && "ADMIN".equalsIgnoreCase(currentUser.getRole());
+        boolean ownsApplication = currentUser != null && "RECRUITER".equalsIgnoreCase(currentUser.getRole())
+                && String.valueOf(currentUser.getId()).equals(application.getRecruiterId());
+        if (!isAdmin && !ownsApplication) {
+            throw new ForbiddenException("Only the job's recruiter can update this application");
+        }
+
         ApplicationStatus currentStatus = application.getStatus();
-        if (currentStatus == null) currentStatus = ApplicationStatus.APPLIED;
+        if (currentStatus == null)
+            currentStatus = ApplicationStatus.APPLIED;
 
         ApplicationStatus newStatus = Application.parseStatus(newStatusStr);
 
@@ -164,9 +178,8 @@ public class ApplicationService {
         if (!currentStatus.canTransitionTo(newStatus)) {
             throw new BadRequestException(
                     "Invalid status transition: " + currentStatus + " → " + newStatus +
-                    ". Allowed transitions from " + currentStatus + ": " +
-                    getValidTransitions(currentStatus)
-            );
+                            ". Allowed transitions from " + currentStatus + ": " +
+                            getValidTransitions(currentStatus));
         }
 
         application.setStatus(newStatus);
@@ -185,9 +198,9 @@ public class ApplicationService {
                         "Application Update",
                         "Your application for " + application.getJobTitle() + " status changed to " +
                                 application.getStatusString(),
-                        "APPLICATION"
-                );
-            } catch (NumberFormatException ignored) {}
+                        "APPLICATION");
+            } catch (NumberFormatException ignored) {
+            }
         }
 
         return ApplicationResponse.fromEntity(saved);
@@ -196,7 +209,8 @@ public class ApplicationService {
     private String getValidTransitions(ApplicationStatus status) {
         List<String> valid = new java.util.ArrayList<>();
         for (ApplicationStatus target : ApplicationStatus.values()) {
-            if (status.canTransitionTo(target)) valid.add(target.name());
+            if (status.canTransitionTo(target))
+                valid.add(target.name());
         }
         return String.join(", ", valid);
     }
