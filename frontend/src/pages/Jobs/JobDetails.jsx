@@ -4,6 +4,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
+import { candidateService } from '../../services/candidateService';
 import { useAuth } from '../../context/AuthContext';
 import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -29,12 +30,13 @@ export default function JobDetails() {
         setLoading(false);
       });
 
-    if (!user?.id) return;
+    if (!user) return;
 
     // Check if the authenticated candidate already applied.
-    applicationService.getByCandidateId(String(user.id))
+    candidateService.getMyProfile()
+      .then(profile => applicationService.getByCandidateId(profile.id))
       .then((apps) => {
-        const hasApplied = apps.some((app) => app.jobId === id.toString());
+        const hasApplied = apps.some((app) => String(app.jobId) === String(id));
         setApplied(hasApplied);
       })
       .catch((err) => console.error(err));
@@ -70,7 +72,7 @@ export default function JobDetails() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: String(user.id),
+        candidateId: user?.id,
         candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,

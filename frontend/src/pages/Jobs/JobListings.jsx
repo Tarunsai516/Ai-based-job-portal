@@ -7,11 +7,14 @@ import EmptyState from '../../components/common/EmptyState';
 import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
+import { candidateService } from '../../services/candidateService';
+import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 
 export default function JobListings() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
+  const [matchScores, setMatchScores] = useState(new Map());
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [searchVal, setSearchVal] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -26,15 +29,24 @@ export default function JobListings() {
   });
 
   useEffect(() => {
-    // Load jobs from live backend
-    jobService.getAll()
-      .then((data) => setJobs(data))
-      .catch((err) => console.error(err));
+    if (!user) {
+      jobService.getAll().then(setJobs).catch((err) => console.error(err));
+      return;
+    }
 
-    // Load applications for the authenticated candidate.
-    if (!user?.id) return;
-    applicationService.getByCandidateId(String(user.id))
-      .then((apps) => setAppliedJobs(apps.map(a => a.jobId)))
+    candidateService.getMyProfile()
+      .then(profile => Promise.all([
+        jobService.getAll(),
+        applicationService.getByCandidateId(profile.id),
+        recommendationService.getForCandidate(profile.id, 0, 50).catch(() => ({ content: [] }))
+      ]))
+      .then(([jobData, apps, recommendationPage]) => {
+        setJobs(jobData);
+        setAppliedJobs(apps.map(a => String(a.jobId)));
+        setMatchScores(new Map(
+          (recommendationPage?.content || []).map(match => [String(match.jobId), match])
+        ));
+      })
       .catch((err) => console.error(err));
   }, [user]);
 
@@ -48,7 +60,7 @@ export default function JobListings() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: String(user.id),
+        candidateId: user?.id,
         candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,
@@ -96,18 +108,17 @@ export default function JobListings() {
       });
     }
 
-    // AI Only match (Seeker skills matching: e.g. React or JavaScript)
-    let matchesAI = true;
-    if (filters.aiOnly && user) {
-      // Mock seeker skills: ['React', 'JavaScript', 'Tailwind CSS']
-      const seekerSkills = ['React', 'JavaScript', 'Tailwind CSS'];
-      const commonSkills = job.skills.filter((s) => seekerSkills.includes(s));
-      // Require at least 3 matching skills for AI match
-      matchesAI = commonSkills.length >= 2;
-    }
+    const match = matchScores.get(String(job.id));
+    const matchesAI = !filters.aiOnly || Boolean(match && match.overallScore >= 50);
 
     return matchesSearch && matchesLocation && matchesType && matchesExp && matchesAI;
   });
+
+  const jobsWithScores = filteredJobs.map(job => ({
+    ...job,
+    matchScore: matchScores.get(String(job.id))?.overallScore,
+    matchExplanation: matchScores.get(String(job.id))?.explanation,
+  }));
 
   return (
     <DashboardLayout>
@@ -174,7 +185,7 @@ export default function JobListings() {
               />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredJobs.map((job) => (
+                {jobsWithScores.map((job) => (
                   <JobCard
                     key={job.id}
                     job={job}

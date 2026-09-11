@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { applicationService } from '../../services/applicationService';
+import { candidateService } from '../../services/candidateService';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/common/EmptyState';
 import { HiOutlineCheck, HiOutlineClock } from 'react-icons/hi';
@@ -38,8 +39,9 @@ export default function ApplicationStatus() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    applicationService.getByCandidateId(candidateId)
+    if (!user) return;
+    candidateService.getMyProfile()
+      .then(profile => applicationService.getByCandidateId(profile.id))
       .then(data => {
         setApplications(Array.isArray(data) ? data : []);
         setLoading(false);

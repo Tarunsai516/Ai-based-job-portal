@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import EmptyState from '../../components/common/EmptyState';
 import { applicationService } from '../../services/applicationService';
+import { candidateService } from '../../services/candidateService';
 import { useAuth } from '../../context/AuthContext';
 import { HiOutlineClock } from 'react-icons/hi';
 
@@ -22,8 +23,9 @@ export default function AppliedJobs() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const candidateId = user?.id || 1;
-    applicationService.getByCandidateId(candidateId)
+    if (!user) return;
+    candidateService.getMyProfile()
+      .then(profile => applicationService.getByCandidateId(profile.id))
       .then(data => {
         setApplications(Array.isArray(data) ? data : []);
         setLoading(false);

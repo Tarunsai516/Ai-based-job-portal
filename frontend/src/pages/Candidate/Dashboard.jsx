@@ -5,6 +5,7 @@ import { analyticsService } from '../../services/analyticsService';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
 import { candidateService } from '../../services/candidateService';
+import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 import Toast from '../../components/common/Toast';
 import EmptyState from '../../components/common/EmptyState';
@@ -35,10 +36,11 @@ export default function CandidateDashboard() {
     try {
       const profileData = await candidateService.getMyProfile();
       const candidateId = String(profileData.id);
-      const [analyticsData, jobsData, appsData] = await Promise.all([
+      const [analyticsData, jobsData, appsData, recommendationPage] = await Promise.all([
         analyticsService.getSeeker(candidateId).catch(() => null),
         jobService.getAll().catch(() => []),
-        applicationService.getByCandidateId(candidateId).catch(() => [])
+        applicationService.getByCandidateId(candidateId).catch(() => []),
+        recommendationService.getForCandidate(candidateId, 0, 4).catch(() => ({ content: [] }))
       ]);
 
       setAnalytics(analyticsData);
@@ -50,22 +52,16 @@ export default function CandidateDashboard() {
 
       const allJobs = Array.isArray(jobsData) ? jobsData : [];
       
-      // Calculate dynamic AI Match score for each job based on candidate's skills
-      const candidateSkills = (profileData?.skills || []).map(s => s.toLowerCase());
-      
-      const scoredJobs = allJobs.map(job => {
-        const reqSkills = (job.skills || []).map(s => s.toLowerCase());
-        let score = 75; // baseline match
-        if (reqSkills.length > 0) {
-          const matchCount = reqSkills.filter(s => candidateSkills.some(cs => cs.includes(s) || s.includes(cs))).length;
-          score = Math.min(98, Math.max(65, Math.round(70 + (matchCount / reqSkills.length) * 28)));
-        }
-        return { ...job, matchScore: score };
-      });
-
-      // Sort by highest matchScore
-      scoredJobs.sort((a, b) => b.matchScore - a.matchScore);
-      setRecommendations(scoredJobs.slice(0, 4));
+      const jobsById = new Map(allJobs.map(job => [String(job.id), job]));
+      const matchedJobs = (recommendationPage?.content || [])
+        .map(match => {
+          const job = jobsById.get(String(match.jobId));
+          return job
+            ? { ...job, matchScore: match.overallScore, matchExplanation: match.explanation }
+            : null;
+        })
+        .filter(Boolean);
+      setRecommendations(matchedJobs);
 
     } catch (err) {
       console.error('Failed loading candidate dashboard:', err);

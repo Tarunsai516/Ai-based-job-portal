@@ -42,6 +42,11 @@ export default function JobCard({ job, onApply, isApplied = false }) {
 
         {/* Badges & Meta Info */}
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-500">
+          {job.matchScore != null && (
+            <span className="px-2.5 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 font-bold">
+              {Math.round(job.matchScore)}% match
+            </span>
+          )}
           <span className={`px-2.5 py-0.5 rounded-full border font-medium ${badgeColors[job.type] || 'bg-gray-50 text-gray-600'}`}>
             {job.type}
           </span>

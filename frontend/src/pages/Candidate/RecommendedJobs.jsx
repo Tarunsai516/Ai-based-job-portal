@@ -5,6 +5,7 @@ import EmptyState from '../../components/common/EmptyState';
 import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
+import { candidateService } from '../../services/candidateService';
 import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 import { HiOutlineSparkles } from 'react-icons/hi';
@@ -40,13 +41,13 @@ export default function RecommendedJobs() {
         })
         .filter(Boolean);
       setJobs(matchedJobs);
-      setAppliedJobIds((Array.isArray(myApps) ? myApps : []).map(a => a.jobId));
+      setAppliedJobIds((Array.isArray(myApps) ? myApps : []).map(a => String(a.jobId)));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
 
   const handleApply = async (job) => {
-    if (appliedJobIds.includes(job.id)) return;
+    if (appliedJobIds.includes(String(job.id))) return;
     try {
       await applicationService.apply({
         jobId: job.id,
@@ -54,7 +55,7 @@ export default function RecommendedJobs() {
         jobTitle: job.title,
         companyName: job.companyName,
       });
-      setAppliedJobIds(prev => [...prev, job.id]);
+      setAppliedJobIds(prev => [...prev, String(job.id)]);
       setToast({ message: `Applied to ${job.title} at ${job.companyName}!`, type: 'success' });
     } catch {
       setToast({ message: 'Failed to apply. Please try again.', type: 'error' });
@@ -108,7 +109,7 @@ export default function RecommendedJobs() {
                 <JobCard
                   job={job}
                   onApply={handleApply}
-                  isApplied={appliedJobIds.includes(job.id)}
+                  isApplied={appliedJobIds.includes(String(job.id))}
                 />
               </div>
             ))}
