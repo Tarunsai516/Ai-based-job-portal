@@ -9,7 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('seeker'); // 'seeker' | 'recruiter' | 'admin'
+  const [role, setRole] = useState('seeker'); // Used only as a visual hint for the login form.
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -29,26 +29,37 @@ export default function Login() {
     
     setLoading(true);
     try {
-      const loggedUser = await login(email, password, role);
+      // The backend already knows the account role. Do not reject valid users
+      // because a stale role tab was selected in the browser.
+      const loggedUser = await login(email.trim(), password);
       setToast({ message: `Successfully logged in as ${loggedUser.name}!`, type: 'success' });
       setTimeout(() => {
-        if (role === 'recruiter') {
+        const authenticatedRole = loggedUser.role?.toLowerCase();
+        if (authenticatedRole === 'recruiter') {
           navigate('/recruiter');
-        } else if (role === 'admin') {
+        } else if (authenticatedRole === 'admin') {
           navigate('/admin');
         } else {
           navigate('/dashboard');
         }
       }, 800);
     } catch (err) {
-      setToast({ message: 'Login failed. Please check your credentials.', type: 'error' });
+      const status = err.response?.status;
+      const serverMessage = err.response?.data?.message;
+      const message = status === 401
+        ? (serverMessage || 'Invalid email or password.')
+        : status
+          ? `Unable to sign in (${status}). Please try again.`
+          : 'Cannot reach TalentSync. Start the backend and try again.';
+      setToast({ message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.2),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(20,184,166,0.12),transparent_28%)]" aria-hidden="true" />
       
       {/* Toast Notification */}
       {toast && (
@@ -59,24 +70,24 @@ export default function Login() {
         />
       )}
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/" className="flex justify-center items-center space-x-2">
-          <span className="text-3xl">🚀</span>
-          <span className="text-2xl font-bold tracking-tight text-blue-600">TalentSync</span>
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+        <Link to="/" className="flex justify-center items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-500 text-sm font-bold text-white">TS</span>
+          <span className="text-2xl font-bold tracking-tight text-white">TalentSync</span>
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
+        <h2 className="mt-8 text-center text-3xl font-bold text-white">
+          Welcome back
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-slate-400">
           Or{' '}
-          <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-500">
+          <Link to="/register" className="font-semibold text-teal-300 hover:text-teal-200">
             register for a new account
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-200">
+        <div className="bg-white py-8 px-4 shadow-2xl shadow-black/20 sm:rounded-2xl sm:px-10 border border-slate-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
             
             {/* Role Picker (Tabs) */}

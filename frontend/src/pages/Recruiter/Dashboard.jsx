@@ -120,28 +120,27 @@ export default function RecruiterDashboard() {
     <DashboardLayout>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="space-y-8">
+      <div className="space-y-7">
 
         {/* Dynamic Recruiter Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 border border-gray-200 rounded-2xl shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 leading-none">
-              Recruitment Dashboard 👋
-            </h1>
-            <p className="text-xs text-gray-500 mt-1">
-              {user?.companyName ? `${user.companyName} · ` : ''}Manage active job openings, applicant pipeline, and AI match scores.
+            <p className="eyebrow">Recruiter workspace</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-white leading-tight">Build the team behind the next chapter.</h1>
+            <p className="text-sm text-slate-500 mt-2">
+              {user?.companyName ? `${user.companyName} · ` : ''}Review the strongest candidates and keep every role moving.
             </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <Link
               to="/recruiter/manage-jobs"
-              className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors shadow-sm"
+              className="px-4 py-2.5 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors"
             >
               Manage Jobs
             </Link>
             <Link
               to="/recruiter/post-job"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1"
             >
               <HiOutlinePlusCircle className="h-4 w-4" />
               <span>Post a Job</span>
@@ -150,10 +149,10 @@ export default function RecruiterDashboard() {
         </div>
 
         {/* Live Key Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {loading
             ? Array(4).fill(0).map((_, i) => (
-                <div key={i} className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm animate-pulse">
+                <div key={i} className="surface p-5 animate-pulse">
                   <div className="h-10 w-10 rounded-lg bg-gray-100 mb-3" />
                   <div className="h-3 bg-gray-100 rounded w-2/3 mb-2" />
                   <div className="h-6 bg-gray-200 rounded w-1/3" />
@@ -162,13 +161,13 @@ export default function RecruiterDashboard() {
             : stats.map((stat, idx) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={idx} className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm flex items-center space-x-4">
+                  <div key={idx} className="surface p-5 flex flex-col gap-4">
                     <div className={`p-3 rounded-lg border ${stat.color}`}>
                       <Icon className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{stat.label}</p>
-                      <p className="text-2xl font-black text-gray-800 mt-0.5">{stat.value}</p>
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">{stat.label}</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{stat.value}</p>
                     </div>
                   </div>
                 );
@@ -182,11 +181,11 @@ export default function RecruiterDashboard() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* Recent Applications Table */}
-            <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm space-y-4">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <h3 className="text-sm font-bold text-gray-900 flex items-center space-x-1">
-                  <HiTrendingUp className="h-5 w-5 text-blue-600" />
-                  <span>Recent Applicant Pipeline</span>
+            <div className="surface p-6 space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-1">
+                  <HiTrendingUp className="h-5 w-5 text-teal-600" />
+                  <span>Recent applicant pipeline</span>
                 </h3>
                 <Link to="/recruiter/applicants" className="text-xs font-semibold text-blue-600 hover:underline">
                   View All ({applications.length}) &rarr;

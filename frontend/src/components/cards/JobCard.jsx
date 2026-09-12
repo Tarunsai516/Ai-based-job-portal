@@ -12,18 +12,18 @@ export default function JobCard({ job, onApply, isApplied = false }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-300 relative flex flex-col justify-between">
+    <div className="surface p-5 hover:-translate-y-0.5 hover:border-blue-300 transition-all duration-200 relative flex flex-col justify-between">
       
       {/* Header Info */}
       <div>
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-3">
-            <div className="h-12 w-12 rounded-lg bg-gray-50 flex items-center justify-center text-2xl border border-gray-150">
+            <div className="h-10 w-10 rounded-lg bg-slate-50 flex items-center justify-center text-xl border border-slate-200">
               {job.companyLogo || '🏢'}
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-gray-500">{job.companyName}</h4>
-              <Link to={`/jobs/${job.id}`} className="text-base font-bold text-gray-905 hover:text-blue-600 transition-colors line-clamp-1">
+              <h4 className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{job.companyName}</h4>
+              <Link to={`/jobs/${job.id}`} className="text-[15px] font-bold text-slate-900 dark:text-white hover:text-blue-600 transition-colors line-clamp-1">
                 {job.title}
               </Link>
             </div>
@@ -43,7 +43,7 @@ export default function JobCard({ job, onApply, isApplied = false }) {
         {/* Badges & Meta Info */}
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-500">
           {job.matchScore != null && (
-            <span className="px-2.5 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 font-bold">
+            <span className="px-2.5 py-0.5 rounded-full border border-teal-200 bg-teal-50 text-teal-700 font-bold">
               {Math.round(job.matchScore)}% match
             </span>
           )}
@@ -65,14 +65,14 @@ export default function JobCard({ job, onApply, isApplied = false }) {
         </div>
 
         {/* Description Snippet */}
-        <p className="mt-3 text-xs text-gray-600 line-clamp-2 leading-relaxed">
+        <p className="mt-3 text-xs text-slate-500 line-clamp-2 leading-relaxed">
           {job.description}
         </p>
 
         {/* Skill Tags */}
         <div className="mt-4 flex flex-wrap gap-1.5">
           {(job.skills || []).map((skill) => (
-            <span key={skill} className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-md font-medium">
+            <span key={skill} className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-md font-medium">
               {skill}
             </span>
           ))}
@@ -80,10 +80,10 @@ export default function JobCard({ job, onApply, isApplied = false }) {
       </div>
 
       {/* Buttons */}
-      <div className="mt-6 flex space-x-3 border-t border-gray-100 pt-4">
+      <div className="mt-5 flex space-x-3 border-t border-slate-100 pt-4">
         <Link
           to={`/jobs/${job.id}`}
-          className="flex-1 text-center py-2 text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+          className="flex-1 text-center py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
         >
           View Details
         </Link>

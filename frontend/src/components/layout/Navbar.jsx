@@ -79,29 +79,30 @@ export default function Navbar() {
   const links = getNavLinks();
 
   return (
-    <nav className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
+    <nav className="sticky top-0 z-50 bg-white/95 dark:bg-slate-950/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-[68px]">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to={user ? (user.role === 'admin' ? '/admin' : (user.role === 'recruiter' ? '/recruiter' : '/dashboard')) : '/'} className="flex items-center space-x-2">
-              <span className="text-2xl">🚀</span>
-              <span className="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
-                TalentSync
+            <Link to={user ? (user.role === 'admin' ? '/admin' : (user.role === 'recruiter' ? '/recruiter' : '/dashboard')) : '/'} className="flex items-center gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm">TS</span>
+              <span className="hidden sm:block">
+                <span className="block text-[15px] font-bold tracking-tight text-slate-950 dark:text-white">TalentSync</span>
+                <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">Better matches</span>
               </span>
             </Link>
           </div>
 
           {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden lg:flex items-center gap-7">
             {links.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 className={`text-sm font-medium transition-colors duration-200 ${
                   location.pathname === link.path
-                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 py-5'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                    ? 'text-blue-700 dark:text-blue-300'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
                 }`}
               >
                 {link.label}
@@ -115,7 +116,7 @@ export default function Navbar() {
             <button
               id="dark-mode-toggle"
               onClick={toggleDarkMode}
-              className="relative p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
+              className="relative p-2 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
               aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               <AnimatePresence mode="wait" initial={false}>
@@ -152,12 +153,12 @@ export default function Navbar() {
                       setNotifDropdownOpen(!notifDropdownOpen);
                       setProfileDropdownOpen(false);
                     }}
-                    className="p-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="relative p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <span className="sr-only">Notifications</span>
                     <HiBell className="h-6 w-6" />
                     {unreadCount > 0 && (
-                      <span className="absolute top-0 right-0 block h-4 w-4 rounded-full bg-emerald-500 text-[10px] font-bold text-white text-center leading-4 ring-2 ring-white dark:ring-gray-900">
+                      <span className="absolute top-0.5 right-0.5 block h-4 w-4 rounded-full bg-rose-500 text-[10px] font-bold text-white text-center leading-4 ring-2 ring-white dark:ring-slate-950">
                         {unreadCount}
                       </span>
                     )}
@@ -213,10 +214,10 @@ export default function Navbar() {
                       setProfileDropdownOpen(!profileDropdownOpen);
                       setNotifDropdownOpen(false);
                     }}
-                    className="flex items-center space-x-1 p-1 rounded-full text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
+                    className="flex items-center gap-2 p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 focus:outline-none"
                   >
-                    <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm">
-                      {user.name.charAt(0)}
+                    <div className="h-8 w-8 rounded-lg bg-slate-900 dark:bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
+                      {user?.name?.charAt(0) || 'U'}
                     </div>
                     <HiChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                   </button>

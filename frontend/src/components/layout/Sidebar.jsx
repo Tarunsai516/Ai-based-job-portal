@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  HiChartBar, 
+  HiHome,
   HiBriefcase, 
   HiDocumentText, 
   HiUser, 
@@ -11,7 +11,9 @@ import {
   HiClipboardList,
   HiOfficeBuilding,
   HiUpload,
-  HiOutlineTicket
+  HiOutlineTicket,
+  HiUsers,
+  HiCalendar
 } from 'react-icons/hi';
 
 export default function Sidebar() {
@@ -20,40 +22,33 @@ export default function Sidebar() {
   if (!user) return null;
 
   const seekerLinks = [
-    { to: '/dashboard', label: 'Dashboard', icon: HiChartBar },
-    { to: '/jobs', label: 'Find Jobs', icon: HiBriefcase },
-    { to: '/recommended-jobs', label: 'AI Recommended', icon: HiSparkles },
-    { to: '/resume/upload', label: 'Resume Upload', icon: HiUpload },
-    { to: '/resume/my', label: 'My Resume', icon: HiDocumentText },
-    { to: '/applied-jobs', label: 'Applied Jobs', icon: HiClipboardList },
-    { to: '/profile', label: 'My Profile', icon: HiUser },
-    { to: '/settings', label: 'Settings', icon: HiCog },
+    { to: '/dashboard', label: 'Overview', icon: HiHome },
+    { to: '/jobs', label: 'Find jobs', icon: HiBriefcase },
+    { to: '/applied-jobs', label: 'Applications', icon: HiClipboardList },
+    { to: '/profile', label: 'Profile & AI insights', icon: HiUser },
   ];
 
   const recruiterLinks = [
-    { to: '/recruiter', label: 'Dashboard', icon: HiChartBar },
-    { to: '/recruiter/post-job', label: 'Post Job', icon: HiUpload },
-    { to: '/recruiter/manage-jobs', label: 'Manage Jobs', icon: HiBriefcase },
-    { to: '/recruiter/applicants', label: 'Applicants List', icon: HiClipboardList },
-    { to: '/recruiter/analytics', label: 'Analytics', icon: HiChartBar },
-    { to: '/recruiter/company', label: 'Company Profile', icon: HiOfficeBuilding },
-    { to: '/recruiter/settings', label: 'Settings', icon: HiCog },
+    { to: '/recruiter', label: 'Overview', icon: HiHome },
+    { to: '/recruiter/manage-jobs', label: 'Jobs', icon: HiBriefcase },
+    { to: '/recruiter/applicants', label: 'Candidates', icon: HiUsers },
+    { to: '/recruiter/analytics', label: 'Interviews & insights', icon: HiCalendar },
   ];
 
   const adminLinks = [
-    { to: '/admin', label: 'Dashboard', icon: HiChartBar },
+    { to: '/admin', label: 'Overview', icon: HiHome },
     { to: '/admin/users', label: 'Manage Users', icon: HiUser },
     { to: '/admin/jobs', label: 'Manage Jobs', icon: HiBriefcase },
-    { to: '/admin/applications', label: 'Manage Applications', icon: HiClipboardList },
+    { to: '/admin/applications', label: 'Applications', icon: HiClipboardList },
     { to: '/admin/support', label: 'Support Tickets', icon: HiOutlineTicket },
   ];
 
   const links = user.role === 'admin' ? adminLinks : (user.role === 'recruiter' ? recruiterLinks : seekerLinks);
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 min-h-[calc(100vh-4rem)] p-4 space-y-1 transition-colors duration-300">
-      <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-        Navigation
+    <aside className="hidden md:flex flex-col w-60 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 min-h-[calc(100vh-4rem)] px-3 py-5 transition-colors duration-300">
+      <div className="px-3 pb-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em]">
+        Workspace
       </div>
       <div className="flex-1 space-y-1">
         {links.map((link) => {
@@ -64,10 +59,10 @@ export default function Sidebar() {
               to={link.to}
               end={link.to === '/dashboard' || link.to === '/recruiter' || link.to === '/admin'}
               className={({ isActive }) =>
-                `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                `flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                 }`
               }
             >

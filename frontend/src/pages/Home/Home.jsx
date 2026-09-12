@@ -15,39 +15,39 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-slate-50">
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative bg-white py-20 border-b border-gray-100 overflow-hidden">
+      <section className="relative bg-white py-20 md:py-28 border-b border-slate-200 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100"
+              className="inline-flex items-center space-x-2 bg-teal-50 text-teal-700 px-3 py-1.5 rounded-full text-[10px] font-bold border border-teal-100 uppercase tracking-wider"
             >
               <HiSparkles className="h-4 w-4 animate-bounce" />
-              <span>Next-Generation AI Matching is Live</span>
+              <span>Explainable AI for better careers</span>
             </motion.div>
             
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight leading-none"
+              className="text-4xl sm:text-6xl font-bold text-slate-950 tracking-tight leading-[1.02]"
             >
-              Find Your Next <span className="text-blue-600">Dream Job</span> <br className="hidden sm:inline" />
-              Powered by Recruiting AI
+              Find work that <span className="text-blue-600">fits you.</span> <br className="hidden sm:inline" />
+              Build a career with signal.
             </motion.h1>
             
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-base text-gray-500 max-w-xl mx-auto font-light leading-relaxed"
+              className="text-base text-slate-500 max-w-xl mx-auto leading-relaxed"
             >
-              Skip the manual search. Our platform parses your skills, experience, and values to match you with top tech employers instantly.
+              TalentSync understands your resume, explains every match, and shows you exactly what to improve before you apply.
             </motion.p>
 
             {/* Global Search Bar */}
@@ -56,7 +56,7 @@ export default function Home() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 }}
               onSubmit={handleSearchSubmit}
-              className="mt-8 flex flex-col sm:flex-row items-center bg-white p-2 rounded-xl border border-gray-200 shadow-md max-w-2xl mx-auto w-full gap-2"
+              className="mt-8 flex flex-col sm:flex-row items-center bg-white p-2 rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50 max-w-2xl mx-auto w-full gap-2"
             >
               <div className="relative flex-1 w-full">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -67,30 +67,30 @@ export default function Home() {
                   value={searchVal}
                   onChange={(e) => setSearchVal(e.target.value)}
                   placeholder="Job title, skills, or keywords..."
-                  className="block w-full pl-10 pr-3 py-3 rounded-lg border-0 placeholder-gray-400 text-sm focus:outline-none focus:ring-0 text-gray-900 bg-white"
+                  className="block w-full pl-10 pr-3 py-3 rounded-lg border-0 placeholder-slate-400 text-sm focus:outline-none focus:ring-0 text-slate-900 bg-white"
                 />
               </div>
               <button
                 type="submit"
                 className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
               >
-                Search Jobs
+                Find opportunities
               </button>
             </motion.form>
           </div>
         </div>
 
         {/* Ambient background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-16 right-[-8rem] h-96 w-96 rounded-full bg-teal-200/25 blur-3xl pointer-events-none"></div>
       </section>
 
       {/* AI Banner */}
-      <section className="bg-gray-900 py-12 text-white border-y border-gray-800">
+      <section className="bg-slate-950 py-12 text-white border-y border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2">
             <h2 className="text-xl font-bold flex items-center space-x-2">
               <HiSparkles className="h-5 w-5 text-emerald-400" />
-              <span>For Recruiters: Smart Compatibility Indexing</span>
+              <span>For teams: spend time on the right candidates</span>
             </h2>
             <p className="text-xs text-gray-400 max-w-xl">
               Upload job descriptions and find candidates mapped directly by match scores. Our pipeline filters out non-relevant resumes automatically.

@@ -23,7 +23,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register(name, email, password, role);
+      await register(name.trim(), email.trim(), password, role);
       setToast({ message: 'Account created successfully! Redirecting...', type: 'success' });
       setTimeout(() => {
         setLoading(false);
@@ -35,12 +35,15 @@ export default function Register() {
       }, 1000);
     } catch (err) {
       setLoading(false);
-      setToast({ message: err.response?.data?.message || 'Registration failed.', type: 'error' });
+      const message = err.response?.data?.message
+        || (err.response ? `Registration failed (${err.response.status}).` : 'Cannot reach TalentSync. Start the backend and try again.');
+      setToast({ message, type: 'error' });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.2),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(20,184,166,0.12),transparent_28%)]" aria-hidden="true" />
       {toast && (
         <Toast
           message={toast.message}
@@ -49,24 +52,24 @@ export default function Register() {
         />
       )}
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link to="/" className="flex justify-center items-center space-x-2">
-          <span className="text-3xl">🚀</span>
-          <span className="text-2xl font-bold tracking-tight text-blue-600">TalentSync</span>
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-md">
+        <Link to="/" className="flex justify-center items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-500 text-sm font-bold text-white">TS</span>
+          <span className="text-2xl font-bold tracking-tight text-white">TalentSync</span>
         </Link>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Create a new account
+        <h2 className="mt-8 text-center text-3xl font-bold text-white">
+          Start with better signal
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-slate-400">
           Or{' '}
-          <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-500">
+          <Link to="/login" className="font-semibold text-teal-300 hover:text-teal-200">
             sign in to your existing account
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-200">
+        <div className="bg-white py-8 px-4 shadow-2xl shadow-black/20 sm:rounded-2xl sm:px-10 border border-slate-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
             
             {/* Role Switcher */}

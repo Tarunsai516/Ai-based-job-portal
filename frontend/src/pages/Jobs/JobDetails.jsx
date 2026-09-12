@@ -19,6 +19,7 @@ export default function JobDetails() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [match, setMatch] = useState(null);
+  const [candidateProfile, setCandidateProfile] = useState(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchError, setMatchError] = useState(false);
 
@@ -39,10 +40,13 @@ export default function JobDetails() {
     // Check if the authenticated candidate already applied.
     setMatchLoading(true);
     candidateService.getMyProfile()
-      .then(profile => Promise.all([
-        applicationService.getByCandidateId(profile.id),
-        recommendationService.getCandidateJobMatch(profile.id, id)
-      ]))
+      .then(profile => {
+        setCandidateProfile(profile);
+        return Promise.all([
+          applicationService.getByCandidateId(profile.id),
+          recommendationService.getCandidateJobMatch(profile.id, id)
+        ]);
+      })
       .then(([apps, matchData]) => {
         const hasApplied = apps.some((app) => String(app.jobId) === String(id));
         setApplied(hasApplied);
@@ -85,11 +89,11 @@ export default function JobDetails() {
         jobTitle: job.title,
         companyName: job.companyName,
         status: 'Applied',
-        candidateId: user?.id,
+        candidateId: candidateProfile?.id,
         candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,
-        matchScore: 88
+        matchScore: match?.overallScore ?? null
       });
       setApplied(true);
       setToast({
@@ -122,7 +126,7 @@ export default function JobDetails() {
         />
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-7">
         
         {/* Back Link */}
         <div>
@@ -135,14 +139,14 @@ export default function JobDetails() {
         </div>
 
         {/* Job Header Info */}
-        <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="surface p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center space-x-4">
             <span className="text-4xl p-3 bg-gray-50 rounded-xl border border-gray-150 select-none">
               {job.companyLogo || '🏢'}
             </span>
             <div className="space-y-1">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{job.companyName}</h4>
-              <h1 className="text-xl md:text-2xl font-extrabold text-gray-900 leading-none">{job.title}</h1>
+              <h4 className="eyebrow">{job.companyName}</h4>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-950 dark:text-white leading-tight mt-1">{job.title}</h1>
               
               <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
                 <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{job.type}</span>
@@ -181,7 +185,7 @@ export default function JobDetails() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
           {/* Main Description */}
-          <div className="lg:col-span-2 space-y-6 bg-white p-6 md:p-8 border border-gray-200 rounded-xl shadow-sm">
+          <div className="lg:col-span-2 space-y-7 surface p-6 md:p-8">
             <div className="space-y-3">
               <h2 className="text-lg font-bold text-gray-905">Job Description</h2>
               <p className="text-xs text-gray-600 leading-relaxed">{job.description}</p>

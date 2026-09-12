@@ -59,22 +59,23 @@ export default function ManageJobs() {
         type="danger"
       />
 
-      <div className="space-y-6">
+      <div className="space-y-7">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Manage Jobs</h1>
-            <p className="text-xs text-gray-500 mt-0.5">View, edit, or remove your posted job listings.</p>
+            <p className="eyebrow">Recruiter workspace</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">Your hiring pipeline starts here.</h1>
+            <p className="text-sm text-slate-500 mt-2">Manage open roles, review candidates, and keep job context clear.</p>
           </div>
           <Link
             to="/recruiter/post-job"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
           >
             + Post a Job
           </Link>
         </div>
 
         {loading ? (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden divide-y divide-gray-100">
+          <div className="surface overflow-hidden divide-y divide-slate-100">
             {[1,2,3].map(i => (
               <div key={i} className="p-6 flex justify-between items-center animate-pulse">
                 <div className="flex space-x-3">
@@ -99,10 +100,10 @@ export default function ManageJobs() {
             onAction={() => window.location.replace('/recruiter/post-job')}
           />
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="surface overflow-hidden">
             <div className="min-w-full divide-y divide-gray-100">
               {jobs.map((job) => (
-                <div key={job.id} className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-gray-50/50 transition-colors">
+                <div key={job.id} className="p-5 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center space-x-3">
                     <span className="text-3xl p-2 bg-gray-50 border border-gray-100 rounded-lg select-none">
                       {job.companyLogo || '🏢'}

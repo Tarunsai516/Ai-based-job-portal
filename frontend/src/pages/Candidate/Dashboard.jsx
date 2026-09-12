@@ -130,55 +130,56 @@ export default function CandidateDashboard() {
     <DashboardLayout>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      <div className="space-y-8">
+      <div className="space-y-7">
 
         {/* Dynamic Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 border border-gray-200 rounded-2xl shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 leading-tight">
-              Welcome Back, {user?.name || candidateProfile?.name || 'Job Seeker'}! 👋
+            <p className="eyebrow">Candidate workspace</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-white leading-tight">
+              Find work that fits your next chapter.
             </h1>
-            <p className="text-xs text-gray-500 mt-1">
-              {candidateProfile?.title ? `${candidateProfile.title} · ` : ''}Here is your live career matching overview.
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-xl">
+              Welcome back, {user?.name || candidateProfile?.name || 'Job Seeker'}. Your profile, matches, and applications are in one place.
             </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-3">
             <Link
               to="/resume/upload"
-              className="px-4 py-2 border border-blue-200 text-blue-600 hover:bg-blue-50 text-xs font-bold rounded-lg transition-colors shadow-sm"
+              className="px-4 py-2.5 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-lg transition-colors"
             >
-              Analyze Resume
+              Improve profile
             </Link>
             <Link
               to="/jobs"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
             >
-              Explore Jobs
+              Find jobs
             </Link>
           </div>
         </div>
 
         {/* Profile Completion Progress Widget (If < 100%) */}
         {completionPercent < 100 && (
-          <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="bg-slate-950 text-white rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="space-y-2 flex-1">
               <div className="flex items-center space-x-2">
-                <HiOutlineSparkles className="h-5 w-5 text-emerald-400 animate-pulse" />
-                <h3 className="text-sm font-bold">Boost Your AI Skill Compatibility Index</h3>
+                <HiOutlineSparkles className="h-5 w-5 text-teal-300" />
+                <h3 className="text-sm font-bold">Make your profile work harder</h3>
               </div>
-              <p className="text-xs text-blue-200 leading-relaxed max-w-2xl">
-                Your profile is <span className="font-extrabold text-white">{completionPercent}% complete</span>. Add your resume or skill tags to increase your compatibility match scores with top recruiters.
+              <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                Your profile is <span className="font-extrabold text-white">{completionPercent}% complete</span>. Add the missing details to get sharper recommendations and stronger match explanations.
               </p>
-              <div className="w-full bg-blue-950/60 rounded-full h-2 mt-2 border border-blue-700/50">
+              <div className="w-full bg-slate-800 rounded-full h-2 mt-2">
                 <div
-                  className="bg-emerald-400 h-2 rounded-full transition-all duration-500"
+                  className="bg-teal-300 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${completionPercent}%` }}
                 />
               </div>
             </div>
             <Link
               to="/profile/edit"
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-md transition-all flex-shrink-0 flex items-center space-x-1"
+              className="px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-950 font-bold text-xs rounded-lg transition-all flex-shrink-0 flex items-center space-x-1"
             >
               <span>Complete Profile</span>
               <HiOutlineArrowRight className="h-4 w-4" />
@@ -187,10 +188,10 @@ export default function CandidateDashboard() {
         )}
 
         {/* Live Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {loading
             ? Array(4).fill(0).map((_, i) => (
-                <div key={i} className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm animate-pulse">
+                <div key={i} className="surface p-5 animate-pulse">
                   <div className="h-10 w-10 rounded-lg bg-gray-100 mb-3" />
                   <div className="h-3 bg-gray-100 rounded w-2/3 mb-2" />
                   <div className="h-6 bg-gray-200 rounded w-1/3" />
@@ -199,13 +200,13 @@ export default function CandidateDashboard() {
             : stats.map((stat, idx) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={idx} className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm flex items-center space-x-4">
-                    <div className={`p-3 rounded-lg border ${stat.color}`}>
+                  <div key={idx} className="surface p-5 flex flex-col gap-4">
+                    <div className={`h-9 w-9 grid place-items-center rounded-lg border ${stat.color}`}>
                       <Icon className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{stat.label}</p>
-                      <p className="text-2xl font-black text-gray-800 mt-0.5">{stat.value}</p>
+                      <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">{stat.label}</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{stat.value}</p>
                     </div>
                   </div>
                 );
@@ -218,12 +219,12 @@ export default function CandidateDashboard() {
           {/* AI Recommended Opportunities */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex justify-between items-center bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
-              <h2 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
-                <HiOutlineSparkles className="text-blue-600 h-5 w-5 animate-pulse" />
-                <span>AI Recommended Opportunities</span>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <HiOutlineSparkles className="text-teal-600 h-5 w-5" />
+                <span>Recommended for you</span>
               </h2>
               <Link to="/recommended-jobs" className="text-xs font-semibold text-blue-600 hover:underline">
-                View All Matches &rarr;
+                View all matches &rarr;
               </Link>
             </div>
 

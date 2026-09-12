@@ -135,10 +135,11 @@ export default function JobListings() {
       <div className="space-y-6">
         
         {/* Search Header */}
-        <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm space-y-4">
+        <div className="space-y-5">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Explore Careers</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Find jobs matching your tech stack, location preferences, and career expectations.</p>
+            <p className="eyebrow">Opportunity search</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">Find your next good fit.</h1>
+            <p className="text-sm text-slate-500 mt-2">Search live roles and use your TalentSync match signal to decide where to spend your time.</p>
           </div>
           <SearchBar
             value={searchVal}
@@ -171,7 +172,7 @@ export default function JobListings() {
           {/* Job List Cards - Right panel */}
           <div className="flex-1 w-full space-y-4">
             <div className="flex justify-between items-center text-xs font-semibold text-gray-500 px-1">
-              <span>Showing {filteredJobs.length} results</span>
+              <span className="text-slate-500">{filteredJobs.length} opportunities</span>
             </div>
 
             {filteredJobs.length === 0 ? (

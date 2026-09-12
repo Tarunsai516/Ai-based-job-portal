@@ -64,21 +64,27 @@ export default function Profile() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-7 max-w-5xl mx-auto">
+
+        <div>
+          <p className="eyebrow">Your career profile</p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">Make your experience easier to discover.</h1>
+          <p className="text-sm text-slate-500 mt-2">Keep your profile current so TalentSync can explain stronger matches and surface better opportunities.</p>
+        </div>
 
         {/* Profile Card Header */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 relative">
+        <div className="surface p-6 md:p-8 relative">
           <Link
             to="/profile/edit"
-            className="absolute top-6 right-6 inline-flex items-center space-x-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="absolute top-6 right-6 inline-flex items-center space-x-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
           >
             <HiPencil className="h-4 w-4" />
             <span>Edit Profile</span>
           </Link>
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
-            <div className="h-20 w-20 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-4xl select-none">
-              {profile?.avatar || '👤'}
+            <div className="h-20 w-20 rounded-2xl bg-slate-950 text-white flex items-center justify-center text-2xl font-bold select-none">
+              {(profile?.name || user?.name || 'U').slice(0, 1).toUpperCase()}
             </div>
             <div className="space-y-2 text-center sm:text-left">
               <h1 className="text-xl font-bold text-gray-900 leading-none">{profile?.name || user?.name || 'Your Name'}</h1>
@@ -93,11 +99,11 @@ export default function Profile() {
         </div>
 
         {/* Profile Details */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 md:p-8 space-y-6">
+        <div className="surface p-6 md:p-8 space-y-6">
 
           {/* Summary */}
           <div className="space-y-2">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">About Me</h2>
+            <h2 className="eyebrow">About me</h2>
             {profile?.summary
               ? <p className="text-xs text-gray-600 leading-relaxed">{profile.summary}</p>
               : <p className="text-xs text-gray-400 italic">No summary added yet. <Link to="/profile/edit" className="text-blue-600 hover:underline">Add one now →</Link></p>
@@ -106,7 +112,7 @@ export default function Profile() {
 
           {/* Skills */}
           <div className="space-y-2 pt-6 border-t border-gray-100">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">Technical Skills</h2>
+            <h2 className="eyebrow">Skills</h2>
             {profile?.skills?.length > 0
               ? (
                 <div className="flex flex-wrap gap-2">
@@ -123,7 +129,7 @@ export default function Profile() {
 
           {/* Experience & Education */}
           <div className="space-y-2 pt-6 border-t border-gray-100">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">Experience & Education</h2>
+            <h2 className="eyebrow">Experience & education</h2>
             <div className="space-y-3">
               <div className="text-xs text-gray-700">
                 <span className="font-bold text-gray-800">Total Years of Experience:</span>{' '}

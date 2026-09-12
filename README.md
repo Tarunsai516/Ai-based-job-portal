@@ -66,3 +66,5 @@ The current semantic score uses deterministic keyword overlap. Embedding-based s
 Backend: `backend\\mvnw.cmd test`
 
 Frontend: `cd frontend && npm run build`
+
+For local login and registration, the backend must be running on port `8080` and connected to MySQL. Set `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` in the backend environment; the repository default is `root`, but it must match the password configured in your local MySQL server. Docker Compose uses PostgreSQL instead and requires Docker Desktop to be running.
