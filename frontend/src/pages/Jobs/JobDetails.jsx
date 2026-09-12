@@ -5,6 +5,7 @@ import Toast from '../../components/common/Toast';
 import { jobService } from '../../services/jobService';
 import { applicationService } from '../../services/applicationService';
 import { candidateService } from '../../services/candidateService';
+import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
 import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -17,6 +18,9 @@ export default function JobDetails() {
   const [applied, setApplied] = useState(false);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [match, setMatch] = useState(null);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -30,16 +34,25 @@ export default function JobDetails() {
         setLoading(false);
       });
 
-    if (!user) return;
+    if (!user || user.role?.toLowerCase() !== 'seeker') return;
 
     // Check if the authenticated candidate already applied.
+    setMatchLoading(true);
     candidateService.getMyProfile()
-      .then(profile => applicationService.getByCandidateId(profile.id))
-      .then((apps) => {
+      .then(profile => Promise.all([
+        applicationService.getByCandidateId(profile.id),
+        recommendationService.getCandidateJobMatch(profile.id, id)
+      ]))
+      .then(([apps, matchData]) => {
         const hasApplied = apps.some((app) => String(app.jobId) === String(id));
         setApplied(hasApplied);
+        setMatch(matchData);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setMatchError(true);
+      })
+      .finally(() => setMatchLoading(false));
   }, [id, user]);
 
   if (loading) {
@@ -148,17 +161,19 @@ export default function JobDetails() {
             >
               <HiShare className="h-5 w-5" />
             </button>
-            <button
-              onClick={handleApply}
-              disabled={applied}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-all ${
-                applied
-                  ? 'bg-gray-100 text-gray-400 border border-gray-250 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              {applied ? 'Applied' : 'Apply Now'}
-            </button>
+            {user?.role?.toLowerCase() === 'seeker' && (
+              <button
+                onClick={handleApply}
+                disabled={applied}
+                className={`flex-1 md:flex-none px-6 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-all ${
+                  applied
+                    ? 'bg-gray-100 text-gray-400 border border-gray-250 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {applied ? 'Applied' : 'Apply Now'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -211,6 +226,48 @@ export default function JobDetails() {
 
           {/* Sidebar Info (Skills, Recruiter Details) */}
           <div className="space-y-6">
+
+            {user?.role?.toLowerCase() === 'seeker' && (
+              <div className="bg-slate-950 text-white p-6 rounded-xl shadow-sm space-y-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 font-bold">AI Match Analysis</p>
+                    <p className="text-xs text-slate-400 mt-1">A deterministic profile comparison with explainable signals.</p>
+                  </div>
+                  {match && <span className="text-[10px] font-bold text-emerald-300">{match.matchLevel?.replace('_', ' ')}</span>}
+                </div>
+
+                {matchLoading && <p className="text-sm text-slate-300">Analyzing your profile...</p>}
+                {matchError && <p className="text-sm text-amber-300">Match analysis is temporarily unavailable. You can still apply normally.</p>}
+                {match && !matchLoading && (
+                  <>
+                    <div className="flex items-end gap-2">
+                      <span className="text-5xl font-black text-white">{Math.round(match.overallScore)}%</span>
+                      <span className="text-xs text-slate-400 pb-2">overall fit</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      {[
+                        ['Skills', match.skillScore],
+                        ['Semantic', match.semanticScore],
+                        ['Experience', match.experienceScore],
+                        ['Education', match.educationScore],
+                        ['Location', match.locationScore],
+                        ['Keywords', match.keywordScore]
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div className="flex justify-between text-[10px] text-slate-400 mb-1"><span>{label}</span><span>{Math.round(value || 0)}%</span></div>
+                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 rounded-full" style={{ width: `${Math.min(100, Math.max(0, value || 0))}%` }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                    {match.matchedSkills?.length > 0 && <div><h4 className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold mb-2">Matched skills</h4><div className="flex flex-wrap gap-2">{match.matchedSkills.map(skill => <span key={skill} className="text-xs bg-emerald-400/10 text-emerald-200 border border-emerald-400/20 px-2 py-1 rounded">{skill}</span>)}</div></div>}
+                    {match.skillGaps?.length > 0 && <div><h4 className="text-[10px] uppercase tracking-wider text-amber-300 font-bold mb-2">Skill gaps</h4><div className="space-y-2">{match.skillGaps.map(gap => <div key={gap.skill} className="flex justify-between text-xs"><span className="text-slate-200">{gap.skill}</span><span className="text-amber-300">{gap.severity}</span></div>)}</div></div>}
+                    <div className="border-t border-slate-800 pt-4 space-y-2"><h4 className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Why this job?</h4><p className="text-xs text-slate-200 leading-relaxed">{match.whyMatch || match.explanation}</p></div>
+                    {match.learningPlan?.length > 0 && <div className="border-t border-slate-800 pt-4"><h4 className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">How to improve</h4><ol className="list-decimal pl-4 space-y-1 text-xs text-slate-300">{match.learningPlan.map(step => <li key={step}>{step}</li>)}</ol></div>}
+                  </>
+                )}
+              </div>
+            )}
             
             {/* Required Skills card */}
             <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm space-y-4">

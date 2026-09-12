@@ -34,6 +34,11 @@ export const candidateService = {
     return response.status === 204 ? null : response.data;
   },
 
+  reviewLatestResume: async () => {
+    const response = await api.get('/resumes/latest/ai-review');
+    return response.data;
+  },
+
   downloadResume: async (resumeId) => {
     const response = await api.get(`/resumes/${resumeId}/file`, { responseType: 'blob' });
     return response.data;

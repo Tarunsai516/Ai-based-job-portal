@@ -40,6 +40,16 @@ public class RecommendationService {
     @Autowired
     private CandidateRepository candidateRepository;
 
+    @Transactional(readOnly = true)
+    public Optional<MatchResult> getMatch(Long candidateId, Long jobId) {
+        return matchingService.getMatch(candidateId, jobId);
+    }
+
+    @Transactional
+    public MatchResult calculateMatch(Long candidateId, Long jobId) {
+        return matchingService.calculateMatch(candidateId, jobId);
+    }
+
     /**
      * Get personalized job recommendations for a candidate, ranked by match score.
      */

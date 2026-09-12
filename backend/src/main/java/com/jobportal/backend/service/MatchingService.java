@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Hybrid AI Job Matching Engine.
@@ -31,20 +32,23 @@ public class MatchingService {
 
     private static final Logger logger = LoggerFactory.getLogger(MatchingService.class);
 
-    @Value("${talentsync.matching.weights.semantic:0.40}")
+    @Value("${talentsync.matching.weights.semantic:0.30}")
     private double weightSemantic;
 
-    @Value("${talentsync.matching.weights.skills:0.30}")
+    @Value("${talentsync.matching.weights.skills:0.35}")
     private double weightSkill;
 
     @Value("${talentsync.matching.weights.experience:0.15}")
     private double weightExperience;
 
-    @Value("${talentsync.matching.weights.location:0.10}")
+    @Value("${talentsync.matching.weights.location:0.05}")
     private double weightLocation;
 
     @Value("${talentsync.matching.weights.education:0.05}")
     private double weightEducation;
+
+    @Value("${talentsync.matching.weights.keywords:0.10}")
+    private double weightKeyword;
 
     @Autowired
     private MatchResultRepository matchResultRepository;
@@ -81,13 +85,14 @@ public class MatchingService {
         Set<String> candidateSkillNames = getCandidateSkillNames(candidate);
 
         // Get job skills (from both normalized and legacy string lists)
-        Set<String> jobSkillNames = getJobSkillNames(job);
+        JobSkillProfile jobSkillProfile = getJobSkillProfile(job);
 
         // Get candidate resume text for semantic analysis
         String resumeText = getLatestResumeText(candidateId);
 
         // 1. Skill Score (30% weight)
-        SkillMatchResult skillResult = calculateSkillScore(candidateSkillNames, jobSkillNames);
+        SkillMatchResult skillResult = calculateSkillScore(candidateSkillNames,
+            jobSkillProfile.required(), jobSkillProfile.preferred());
 
         // 2. Experience Score (15% weight)
         double experienceScore = calculateExperienceScore(candidate.getExperience(), job.getExperience());
@@ -101,20 +106,23 @@ public class MatchingService {
         // 5. Semantic Score (40% weight) — keyword overlap between resume and job
         // description
         double semanticScore = calculateSemanticScore(resumeText, job.getDescription(), candidate.getSummary());
+        double keywordScore = calculateKeywordScore(candidate, job, candidateSkillNames,
+            jobSkillProfile.allSkills());
 
         // Weighted overall score
         double overallScore = (semanticScore * weightSemantic)
                 + (skillResult.score * weightSkill)
                 + (experienceScore * weightExperience)
                 + (locationScore * weightLocation)
-                + (educationScore * weightEducation);
+                + (educationScore * weightEducation)
+                + (keywordScore * weightKeyword);
 
         overallScore = Math.max(0, Math.min(100, overallScore));
 
         // Generate explanation
         String explanation = generateExplanation(
                 overallScore, semanticScore, skillResult, experienceScore,
-                locationScore, educationScore, candidate, job);
+                locationScore, educationScore, keywordScore, candidate, job);
 
         // Persist or update match result
         MatchResult matchResult = matchResultRepository
@@ -129,8 +137,17 @@ public class MatchingService {
         matchResult.setExperienceScore(Math.round(experienceScore * 10.0) / 10.0);
         matchResult.setLocationScore(Math.round(locationScore * 10.0) / 10.0);
         matchResult.setEducationScore(Math.round(educationScore * 10.0) / 10.0);
-        matchResult.setMatchedSkills(new ArrayList<>(skillResult.matched));
-        matchResult.setMissingSkills(new ArrayList<>(skillResult.missing));
+        matchResult.setKeywordScore(Math.round(keywordScore * 10.0) / 10.0);
+        matchResult.setMatchedSkills(skillResult.matched.stream().map(this::display).collect(Collectors.toList()));
+        matchResult.setMissingSkills(skillResult.missing.stream().map(this::display).collect(Collectors.toList()));
+        matchResult.setRequiredSkillGaps(skillResult.requiredMissing.stream().map(this::display).collect(Collectors.toList()));
+        matchResult.setPreferredSkillGaps(skillResult.preferredMissing.stream().map(this::display).collect(Collectors.toList()));
+        matchResult.setMatchLevel(matchLevel(overallScore));
+        matchResult.setStrengths(buildStrengths(skillResult, semanticScore, experienceScore));
+        matchResult.setSkillGaps(buildSkillGaps(skillResult));
+        matchResult.setLearningPlan(buildLearningPlan(skillResult));
+        matchResult.setWhyMatch(buildWhyMatch(skillResult, candidate, job));
+        matchResult.setRecommendation(recommendation(matchLevel(overallScore)));
         matchResult.setExplanation(explanation);
         matchResult.setCalculatedAt(LocalDateTime.now());
 
@@ -206,7 +223,7 @@ public class MatchingService {
         Set<String> skills = new HashSet<>();
         // From legacy string list
         if (candidate.getSkills() != null) {
-            candidate.getSkills().forEach(s -> skills.add(skillService.normalize(s)));
+            candidate.getSkills().stream().map(this::normalize).filter(s -> !s.isBlank()).forEach(skills::add);
         }
         // From normalized CandidateSkill table
         candidateSkillRepository.findByCandidateId(candidate.getId())
@@ -214,14 +231,31 @@ public class MatchingService {
         return skills;
     }
 
-    private Set<String> getJobSkillNames(Job job) {
-        Set<String> skills = new HashSet<>();
+    private JobSkillProfile getJobSkillProfile(Job job) {
+        Set<String> required = new HashSet<>();
+        Set<String> preferred = new HashSet<>();
         if (job.getSkills() != null) {
-            job.getSkills().forEach(s -> skills.add(skillService.normalize(s)));
+            job.getSkills().stream().map(this::normalize).filter(s -> !s.isBlank()).forEach(required::add);
         }
         jobSkillRepository.findByJobId(job.getId())
-                .forEach(js -> skills.add(js.getSkill().getNormalizedName()));
-        return skills;
+                .forEach(js -> {
+                    String skill = js.getSkill() == null ? "" : normalize(js.getSkill().getNormalizedName());
+                    if (skill.isBlank()) return;
+                    if (js.isRequired()) {
+                        required.add(skill);
+                        preferred.remove(skill);
+                    } else if (!required.contains(skill)) {
+                        preferred.add(skill);
+                    }
+                });
+        Set<String> all = new HashSet<>(required);
+        all.addAll(preferred);
+        return new JobSkillProfile(required, preferred, all);
+    }
+
+    private String normalize(String skill) {
+        String normalized = skillService.normalize(skill);
+        return normalized == null ? "" : normalized;
     }
 
     private String getLatestResumeText(Long candidateId) {
@@ -233,22 +267,40 @@ public class MatchingService {
     /**
      * Skill overlap scoring using Jaccard-like similarity.
      */
-    static SkillMatchResult calculateSkillScore(Set<String> candidateSkills, Set<String> jobSkills) {
-        if (jobSkills.isEmpty()) {
-            return new SkillMatchResult(50.0, Set.of(), Set.of()); // no requirements → neutral
+    static SkillMatchResult calculateSkillScore(Set<String> candidateSkills, Set<String> requiredSkills,
+            Set<String> preferredSkills) {
+        if (requiredSkills.isEmpty() && preferredSkills.isEmpty()) {
+                return new SkillMatchResult(50.0, Set.of(), Set.of(), Set.of(), Set.of()); // no requirements -> neutral
         }
 
         Set<String> matched = new HashSet<>(candidateSkills);
-        matched.retainAll(jobSkills);
+        matched.retainAll(union(requiredSkills, preferredSkills));
 
-        Set<String> missing = new HashSet<>(jobSkills);
-        missing.removeAll(candidateSkills);
+        Set<String> requiredMissing = new HashSet<>(requiredSkills);
+        requiredMissing.removeAll(candidateSkills);
+        Set<String> preferredMissing = new HashSet<>(preferredSkills);
+        preferredMissing.removeAll(candidateSkills);
+        Set<String> missing = union(requiredMissing, preferredMissing);
 
-        double score = (matched.size() * 100.0) / jobSkills.size();
-        return new SkillMatchResult(score, matched, missing);
+        double requiredScore = requiredSkills.isEmpty() ? 100 : requiredSkills.size() - requiredMissing.size();
+        requiredScore = requiredSkills.isEmpty() ? 100 : requiredScore * 100.0 / requiredSkills.size();
+        double preferredScore = preferredSkills.isEmpty() ? 100
+                : (preferredSkills.size() - preferredMissing.size()) * 100.0 / preferredSkills.size();
+        double score = requiredSkills.isEmpty() ? preferredScore
+                : preferredSkills.isEmpty() ? requiredScore : requiredScore * 0.70 + preferredScore * 0.30;
+        return new SkillMatchResult(score, matched, missing, requiredMissing, preferredMissing);
     }
 
-    record SkillMatchResult(double score, Set<String> matched, Set<String> missing) {
+    private static Set<String> union(Set<String> first, Set<String> second) {
+        Set<String> result = new HashSet<>(first);
+        result.addAll(second);
+        return result;
+    }
+
+    record JobSkillProfile(Set<String> required, Set<String> preferred, Set<String> allSkills) {}
+
+    record SkillMatchResult(double score, Set<String> matched, Set<String> missing,
+                            Set<String> requiredMissing, Set<String> preferredMissing) {
     }
 
     /**
@@ -389,6 +441,30 @@ public class MatchingService {
                 .filter(t -> t.length() >= 2)
                 .collect(Collectors.toSet());
     }
+    
+    private double calculateKeywordScore(Candidate candidate, Job job, Set<String> candidateSkills,
+            Set<String> jobSkills) {
+        Set<String> candidateKeywords = tokenize((candidate.getSummary() == null ? "" : candidate.getSummary())
+                + " " + String.join(" ", candidateSkills));
+        Set<String> jobKeywords = tokenize((job.getTitle() == null ? "" : job.getTitle()) + " "
+                + (job.getDescription() == null ? "" : job.getDescription()) + " "
+                + String.join(" ", jobSkills) + " " + String.join(" ", safeList(job.getResponsibilities()))
+                + " " + String.join(" ", safeList(job.getQualifications())));
+        jobKeywords.removeAll(stopWords());
+        candidateKeywords.removeAll(stopWords());
+        if (jobKeywords.isEmpty()) return 50;
+        Set<String> overlap = new HashSet<>(candidateKeywords);
+        overlap.retainAll(jobKeywords);
+        return overlap.size() * 100.0 / jobKeywords.size();
+    }
+    
+    private static Set<String> stopWords() {
+        return Set.of("the", "and", "is", "with", "for", "of", "to", "in", "a", "an", "on", "at", "or");
+    }
+    
+    private static List<String> safeList(List<String> values) {
+        return values == null ? List.of() : values;
+    }
 
     static double parseYears(String experience) {
         if (experience == null || experience.isEmpty())
@@ -403,7 +479,7 @@ public class MatchingService {
     }
 
     private String generateExplanation(double overall, double semantic, SkillMatchResult skillResult,
-            double experience, double location, double education,
+            double experience, double location, double education, double keyword,
             Candidate candidate, Job job) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("MATCH SCORE: %.0f%%\n\n", overall));
@@ -414,6 +490,7 @@ public class MatchingService {
         sb.append(String.format("  Experience: %.0f/100 (weight: %.0f%%)\n", experience, weightExperience * 100));
         sb.append(String.format("  Location: %.0f/100 (weight: %.0f%%)\n", location, weightLocation * 100));
         sb.append(String.format("  Education: %.0f/100 (weight: %.0f%%)\n\n", education, weightEducation * 100));
+        sb.append(String.format("  Keywords: %.0f/100 (weight: %.0f%%)\n\n", keyword, weightKeyword * 100));
 
         if (!skillResult.matched.isEmpty()) {
             sb.append("MATCHED SKILLS:\n");
@@ -436,5 +513,62 @@ public class MatchingService {
         }
 
         return sb.toString();
+    }
+
+    private String matchLevel(double score) {
+        if (score >= 90) return "EXCELLENT_MATCH";
+        if (score >= 80) return "STRONG_MATCH";
+        if (score >= 70) return "GOOD_MATCH";
+        if (score >= 60) return "MODERATE_MATCH";
+        return "LOW_MATCH";
+    }
+
+    private String recommendation(String level) {
+        return switch (level) {
+            case "EXCELLENT_MATCH" -> "Excellent match - your profile strongly aligns with this role.";
+            case "STRONG_MATCH" -> "Strong match - your core skills align well with this role.";
+            case "GOOD_MATCH" -> "Good match - you meet several important requirements for this role.";
+            case "MODERATE_MATCH" -> "Moderate match - closing the highlighted skill gaps could improve your fit.";
+            default -> "Lower match - review the highlighted gaps before applying.";
+        };
+    }
+
+    private List<String> buildStrengths(SkillMatchResult skillResult, double semantic, double experience) {
+        List<String> strengths = new ArrayList<>();
+        if (!skillResult.matched.isEmpty()) strengths.add("Relevant skills: " + joinDisplay(skillResult.matched));
+        if (semantic >= 70) strengths.add("Resume language aligns with the job description");
+        if (experience >= 90) strengths.add("Experience meets or exceeds the stated requirement");
+        return strengths;
+    }
+
+    private List<MatchSkillGap> buildSkillGaps(SkillMatchResult result) {
+        List<MatchSkillGap> gaps = new ArrayList<>();
+        result.requiredMissing.forEach(skill -> gaps.add(new MatchSkillGap(display(skill), "HIGH", "Listed as a required skill")));
+        result.preferredMissing.forEach(skill -> gaps.add(new MatchSkillGap(display(skill), "MEDIUM", "Listed as a preferred skill")));
+        return gaps;
+    }
+
+    private List<String> buildLearningPlan(SkillMatchResult result) {
+        return Stream.concat(result.requiredMissing.stream(), result.preferredMissing.stream())
+                .limit(5)
+                .map(skill -> "Build practical experience with " + display(skill) + " through a focused project.")
+                .collect(Collectors.toList());
+    }
+
+    private String buildWhyMatch(SkillMatchResult result, Candidate candidate, Job job) {
+        if (result.matched.isEmpty()) return "Your profile has limited overlap with the listed requirements. Review the skill gaps to improve your match.";
+        return "Your " + joinDisplay(result.matched.stream().limit(3).collect(Collectors.toSet()))
+                + " experience aligns with the core requirements for " + (job.getTitle() == null ? "this role" : job.getTitle()) + ".";
+    }
+
+    private String joinDisplay(Collection<String> skills) {
+        return skills.stream().map(this::display).collect(Collectors.joining(", "));
+    }
+
+    private String display(String skill) {
+        if (skill == null || skill.isBlank()) return skill;
+        return Arrays.stream(skill.split(" "))
+                .map(word -> word.isEmpty() ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1))
+                .collect(Collectors.joining(" "));
     }
 }

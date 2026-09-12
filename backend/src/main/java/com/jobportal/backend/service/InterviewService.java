@@ -101,8 +101,13 @@ public class InterviewService {
 
         // Create notification
         if (candidateId != null) {
+            Long candidateUserId = candidateRepository.findById(candidateId)
+                    .map(candidate -> candidate.getUserId())
+                    .orElse(null);
+            if (candidateUserId == null)
+                return interview;
             notificationService.createNotification(
-                    candidateId,
+                    candidateUserId,
                     "seeker",
                     "Interview Scheduled",
                     "Your interview for " + application.getJobTitle() + " at " +
@@ -135,6 +140,18 @@ public class InterviewService {
                 app.setStatus(ApplicationStatus.INTERVIEW_COMPLETED);
                 applicationRepository.save(app);
             });
+        }
+
+        Long candidateUserId = interview.getCandidateId() == null ? null
+                : candidateRepository.findById(interview.getCandidateId())
+                        .map(candidate -> candidate.getUserId()).orElse(null);
+        if (candidateUserId != null) {
+            notificationService.createNotification(candidateUserId, "seeker",
+                    "Interview Update", "Your interview status is now " + newStatus.name(), "INTERVIEW");
+        }
+        if (interview.getRecruiterId() != null) {
+            notificationService.createNotification(interview.getRecruiterId(), "recruiter",
+                    "Interview Update", "Interview status changed to " + newStatus.name(), "INTERVIEW");
         }
 
         return interviewRepository.save(interview);

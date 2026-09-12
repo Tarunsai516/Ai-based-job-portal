@@ -108,7 +108,7 @@ export default function AppRoutes() {
       <Route
         path="/jobs/:id"
         element={
-          <ProtectedRoute allowedRoles={['seeker']}>
+          <ProtectedRoute allowedRoles={['seeker', 'recruiter', 'admin']}>
             <JobDetails />
           </ProtectedRoute>
         }

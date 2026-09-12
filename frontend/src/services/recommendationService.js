@@ -7,4 +7,9 @@ export const recommendationService = {
     });
     return response.data;
   },
+
+  getCandidateJobMatch: async (candidateId, jobId) => {
+    const response = await api.get(`/recommendations/candidate/${candidateId}/job/${jobId}`);
+    return response.data;
+  },
 };

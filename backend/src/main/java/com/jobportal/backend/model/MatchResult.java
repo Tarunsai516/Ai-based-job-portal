@@ -43,6 +43,11 @@ public class MatchResult {
     /** Education match score (0-100). */
     private double educationScore;
 
+    /** Independent keyword overlap score (0-100). */
+    private double keywordScore;
+
+    private String matchLevel;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "match_matched_skills", joinColumns = @JoinColumn(name = "match_result_id"))
     @Column(name = "skill")
@@ -52,6 +57,29 @@ public class MatchResult {
     @CollectionTable(name = "match_missing_skills", joinColumns = @JoinColumn(name = "match_result_id"))
     @Column(name = "skill")
     private List<String> missingSkills = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "match_required_skill_gaps", joinColumns = @JoinColumn(name = "match_result_id"))
+    private List<String> requiredSkillGaps = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "match_preferred_skill_gaps", joinColumns = @JoinColumn(name = "match_result_id"))
+    private List<String> preferredSkillGaps = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "match_strengths", joinColumns = @JoinColumn(name = "match_result_id"))
+    private List<String> strengths = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "match_skill_gaps", joinColumns = @JoinColumn(name = "match_result_id"))
+    private List<MatchSkillGap> skillGaps = new ArrayList<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "match_learning_plan", joinColumns = @JoinColumn(name = "match_result_id"))
+    private List<String> learningPlan = new ArrayList<>();
+
+    private String whyMatch;
+    private String recommendation;
 
     /** Structured explanation of the match. */
     @Column(columnDefinition = "TEXT")
@@ -108,11 +136,38 @@ public class MatchResult {
     public double getEducationScore() { return educationScore; }
     public void setEducationScore(double educationScore) { this.educationScore = educationScore; }
 
+    public double getKeywordScore() { return keywordScore; }
+    public void setKeywordScore(double keywordScore) { this.keywordScore = keywordScore; }
+
+    public String getMatchLevel() { return matchLevel; }
+    public void setMatchLevel(String matchLevel) { this.matchLevel = matchLevel; }
+
     public List<String> getMatchedSkills() { return matchedSkills; }
     public void setMatchedSkills(List<String> matchedSkills) { this.matchedSkills = matchedSkills; }
 
     public List<String> getMissingSkills() { return missingSkills; }
     public void setMissingSkills(List<String> missingSkills) { this.missingSkills = missingSkills; }
+
+    public List<String> getRequiredSkillGaps() { return requiredSkillGaps; }
+    public void setRequiredSkillGaps(List<String> requiredSkillGaps) { this.requiredSkillGaps = requiredSkillGaps; }
+
+    public List<String> getPreferredSkillGaps() { return preferredSkillGaps; }
+    public void setPreferredSkillGaps(List<String> preferredSkillGaps) { this.preferredSkillGaps = preferredSkillGaps; }
+
+    public List<String> getStrengths() { return strengths; }
+    public void setStrengths(List<String> strengths) { this.strengths = strengths; }
+
+    public List<MatchSkillGap> getSkillGaps() { return skillGaps; }
+    public void setSkillGaps(List<MatchSkillGap> skillGaps) { this.skillGaps = skillGaps; }
+
+    public List<String> getLearningPlan() { return learningPlan; }
+    public void setLearningPlan(List<String> learningPlan) { this.learningPlan = learningPlan; }
+
+    public String getWhyMatch() { return whyMatch; }
+    public void setWhyMatch(String whyMatch) { this.whyMatch = whyMatch; }
+
+    public String getRecommendation() { return recommendation; }
+    public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
 
     public String getExplanation() { return explanation; }
     public void setExplanation(String explanation) { this.explanation = explanation; }

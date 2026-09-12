@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Collections;
 import java.util.UUID;
 
 /**
@@ -218,6 +219,19 @@ public class ResumeService {
         return resumeRepository.findByUserId(userId).stream()
                 .max(java.util.Comparator.comparing(Resume::getCreatedAt))
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public com.jobportal.backend.service.ai.ResumeCoachResult reviewLatestResume(Long userId) {
+        Resume resume = getLatestResumeForUser(userId);
+        if (resume == null || resume.getRawText() == null || resume.getRawText().isBlank()) {
+            throw new BadRequestException("Upload and process a resume before requesting an AI review");
+        }
+
+        List<String> skills = candidateRepository.findByUserId(userId)
+                .map(Candidate::getSkills)
+                .orElse(Collections.emptyList());
+        return aiProvider.coachResume(resume.getRawText(), "", skills, Collections.emptyList());
     }
 
     /**

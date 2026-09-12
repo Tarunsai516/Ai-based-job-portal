@@ -55,4 +55,24 @@ public class RecommendationController {
     public ResponseEntity<List<MatchResult>> getRankedCandidatesForJob(@PathVariable Long jobId) {
         return ResponseEntity.ok(recommendationService.getRankedCandidatesForJob(jobId));
     }
+
+    @GetMapping("/candidate/{candidateId}/job/{jobId}")
+    public ResponseEntity<MatchResult> getCandidateJobMatch(
+            @PathVariable Long candidateId,
+            @PathVariable Long jobId) {
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserDetails();
+        if (currentUser == null) {
+            throw new ForbiddenException("Authentication is required to access match details");
+        }
+        boolean privileged = "ADMIN".equalsIgnoreCase(currentUser.getRole())
+                || "RECRUITER".equalsIgnoreCase(currentUser.getRole());
+        boolean ownsCandidate = candidateRepository.findById(candidateId)
+                .map(candidate -> currentUser.getId().equals(candidate.getUserId()))
+                .orElse(false);
+        if (!privileged && !ownsCandidate) {
+            throw new ForbiddenException("You can only access your own match details");
+        }
+        return ResponseEntity.ok(recommendationService.getMatch(candidateId, jobId)
+                .orElseGet(() -> recommendationService.calculateMatch(candidateId, jobId)));
+    }
 }

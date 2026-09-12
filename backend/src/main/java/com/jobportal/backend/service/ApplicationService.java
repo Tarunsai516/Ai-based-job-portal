@@ -12,6 +12,7 @@ import com.jobportal.backend.model.enums.ApplicationStatus;
 import com.jobportal.backend.model.enums.AuditAction;
 import com.jobportal.backend.repository.ApplicationRepository;
 import com.jobportal.backend.repository.JobRepository;
+import com.jobportal.backend.repository.CandidateRepository;
 import com.jobportal.backend.security.CustomUserDetails;
 import com.jobportal.backend.security.SecurityUtils;
 import org.slf4j.Logger;
@@ -35,6 +36,9 @@ public class ApplicationService {
 
     @Autowired
     private JobRepository jobRepository;
+
+    @Autowired
+    private CandidateRepository candidateRepository;
 
     @Autowired
     private MatchingService matchingService;
@@ -192,8 +196,14 @@ public class ApplicationService {
         // Notify candidate
         if (application.getCandidateId() != null) {
             try {
+                Long candidateId = Long.parseLong(application.getCandidateId());
+                Long candidateUserId = candidateRepository.findById(candidateId)
+                        .map(candidate -> candidate.getUserId())
+                        .orElse(null);
+                if (candidateUserId == null)
+                    return ApplicationResponse.fromEntity(saved);
                 notificationService.createNotification(
-                        Long.parseLong(application.getCandidateId()),
+                        candidateUserId,
                         "seeker",
                         "Application Update",
                         "Your application for " + application.getJobTitle() + " status changed to " +

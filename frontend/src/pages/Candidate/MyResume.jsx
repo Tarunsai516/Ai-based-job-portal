@@ -9,6 +9,8 @@ export default function MyResume() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   const openResume = async () => {
     if (!profile?.resumeId) return;
@@ -23,7 +25,15 @@ export default function MyResume() {
 
     setLoading(true);
     Promise.all([candidateService.getMyProfile(), candidateService.getLatestResume()])
-      .then(([data, resume]) => { setProfile({ ...data, resumeId: resume?.resumeId }); setLoading(false); })
+      .then(async ([data, resume]) => {
+        setProfile({ ...data, resumeId: resume?.resumeId });
+        if (resume?.status === 'COMPLETED') {
+          setReviewLoading(true);
+          try { setReview(await candidateService.reviewLatestResume()); } catch (_) { setReview(null); }
+          setReviewLoading(false);
+        }
+        setLoading(false);
+      })
       .catch(() => { setProfile(null); setLoading(false); });
   }, [user]);
 
@@ -128,6 +138,18 @@ export default function MyResume() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {(reviewLoading || review) && (
+                <div className="pt-5 border-t border-gray-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">TalentSync AI Resume Review</span>
+                    {review && <span className="text-2xl font-black text-emerald-600">{review.resumeScore}<span className="text-xs">/100</span></span>}
+                  </div>
+                  {reviewLoading && <p className="text-xs text-gray-500">Reading your experience, impact, and skills...</p>}
+                  {review?.weakSections?.length > 0 && <div><p className="text-[10px] font-bold uppercase text-gray-400 mb-2">Focus areas</p><div className="flex flex-wrap gap-2">{review.weakSections.map(section => <span key={section} className="text-xs px-2 py-1 rounded bg-amber-50 border border-amber-100 text-amber-700">{section}</span>)}</div></div>}
+                  {review?.suggestions?.length > 0 && <div className="space-y-2">{review.suggestions.slice(0, 4).map((suggestion, index) => <div key={`${suggestion.section}-${index}`} className="bg-gray-50 border border-gray-100 rounded-lg p-3"><p className="text-xs font-bold text-gray-800">{suggestion.section || 'Resume improvement'}</p><p className="text-[11px] text-gray-600 mt-1 leading-relaxed">{suggestion.reason}</p>{suggestion.suggestedText && <p className="text-[11px] text-emerald-700 mt-2 leading-relaxed">{suggestion.suggestedText}</p>}</div>)}</div>}
                 </div>
               )}
             </div>

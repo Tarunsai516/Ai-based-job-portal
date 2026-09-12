@@ -5,6 +5,7 @@ import Toast from '../../components/common/Toast';
 import { candidateService } from '../../services/candidateService';
 import { applicationService } from '../../services/applicationService';
 import { interviewService } from '../../services/interviewService';
+import { recommendationService } from '../../services/recommendationService';
 import { HiOutlineChevronLeft, HiOutlineMail, HiOutlinePhone, HiOutlineLocationMarker, HiCheckCircle, HiOutlineDownload } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
@@ -19,26 +20,38 @@ export default function CandidateDetails() {
   const [meetingLink, setMeetingLink] = useState('');
   const [scheduling, setScheduling] = useState(false);
   const [candidate, setCandidate] = useState(null);
+  const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     // Parse route ID parameter (which could be string or numeric)
-    const queryId = isNaN(id) ? 1 : parseInt(id, 10);
+    const queryId = Number.parseInt(id, 10);
+    if (!Number.isInteger(queryId) || queryId < 1) {
+      setLoading(false);
+      return;
+    }
     candidateService.getById(queryId)
       .then((data) => {
         setCandidate(data);
-        return applicationService.getByCandidateId(data.id);
+        return applicationService.getByCandidateId(data.id)
+          .then(applications => ({ candidate: data, applications }));
       })
-      .then((applications) => {
+      .then(({ candidate: candidateData, applications }) => {
         const requestedApplicationId = searchParams.get('applicationId');
         const candidateApplication = Array.isArray(applications)
-          ? applications.find(app => String(app.id) === requestedApplicationId) || applications[0]
+          ? applications.find(app => String(app.id) === requestedApplicationId)
+            || [...applications].sort((first, second) => (second.matchScore || 0) - (first.matchScore || 0))[0]
           : null;
         setApplication(candidateApplication);
         if (candidateApplication?.status) setStatus(candidateApplication.status);
+        if (candidateApplication?.jobId) {
+          return recommendationService.getCandidateJobMatch(candidateData.id, candidateApplication.jobId)
+            .then(matchData => setMatch(matchData));
+        }
         setLoading(false);
       })
+      .then(() => setLoading(false))
       .catch((err) => {
         console.error(err);
         setLoading(false);
@@ -197,9 +210,9 @@ export default function CandidateDetails() {
             <div className="relative h-32 w-32 flex items-center justify-center">
               <svg className="absolute inset-0 h-full w-full transform -rotate-90">
                 <circle cx="64" cy="64" r="54" className="stroke-gray-100 fill-none" strokeWidth="8" />
-                <circle cx="64" cy="64" r="54" className="stroke-emerald-500 fill-none" strokeWidth="8" strokeDasharray="339.29" strokeDashoffset={339.29 - (339.29 * candidate.matchScore) / 100} />
+                <circle cx="64" cy="64" r="54" className="stroke-emerald-500 fill-none" strokeWidth="8" strokeDasharray="339.29" strokeDashoffset={339.29 - (339.29 * (match?.overallScore || 0)) / 100} />
               </svg>
-              <span className="text-2xl font-black text-emerald-600">{candidate.matchScore}%</span>
+              <span className="text-2xl font-black text-emerald-600">{match ? `${Math.round(match.overallScore)}%` : '—'}</span>
             </div>
 
             {/* Parameter Progress Bars */}
@@ -207,30 +220,30 @@ export default function CandidateDetails() {
               <div className="space-y-1">
                 <div className="flex justify-between font-bold text-gray-600">
                   <span>Skills Compatibility</span>
-                  <span>95%</span>
+                  <span>{match ? `${Math.round(match.skillScore)}%` : '—'}</span>
                 </div>
                 <div className="w-full bg-gray-100 h-1.5 rounded-full">
-                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: '95%' }}></div>
+                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${match?.skillScore || 0}%` }}></div>
                 </div>
               </div>
 
               <div className="space-y-1">
                 <div className="flex justify-between font-bold text-gray-600">
                   <span>Experience Alignment</span>
-                  <span>90%</span>
+                  <span>{match ? `${Math.round(match.experienceScore)}%` : '—'}</span>
                 </div>
                 <div className="w-full bg-gray-100 h-1.5 rounded-full">
-                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: '90%' }}></div>
+                  <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${match?.experienceScore || 0}%` }}></div>
                 </div>
               </div>
 
               <div className="space-y-1">
                 <div className="flex justify-between font-bold text-gray-600">
                   <span>Education Relevance</span>
-                  <span>85%</span>
+                  <span>{match ? `${Math.round(match.educationScore)}%` : '—'}</span>
                 </div>
                 <div className="w-full bg-gray-100 h-1.5 rounded-full">
-                  <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: '85%' }}></div>
+                  <div className="bg-purple-500 h-1.5 rounded-full" style={{ width: `${match?.educationScore || 0}%` }}></div>
                 </div>
               </div>
             </div>
@@ -257,7 +270,7 @@ export default function CandidateDetails() {
                   <HiCheckCircle className="h-4 w-4 mr-1" /> Matching Skills
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {(candidate.skills || []).map((skill) => (
+                  {(match?.matchedSkills || []).map((skill) => (
                     <span key={skill} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs px-2.5 py-0.5 rounded-md font-semibold">
                       {skill}
                     </span>
@@ -271,7 +284,7 @@ export default function CandidateDetails() {
                   Missing Skills
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {(candidate.missingSkills || []).map((skill) => (
+                  {(match?.missingSkills || []).map((skill) => (
                     <span key={skill} className="bg-red-50 text-red-750 border border-red-100 text-xs px-2.5 py-0.5 rounded-md font-semibold">
                       {skill}
                     </span>

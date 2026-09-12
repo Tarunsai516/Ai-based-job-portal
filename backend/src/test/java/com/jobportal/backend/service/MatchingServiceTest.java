@@ -15,6 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -99,5 +100,27 @@ class MatchingServiceTest {
         assertNotNull(result.getExplanation());
         assertNotNull(result.getMatchedSkills());
         verify(matchResultRepository, times(1)).save(any(MatchResult.class));
+    }
+
+    @Test
+    void skillService_normalizesCommonAliases() {
+        SkillService service = new SkillService();
+
+        assertEquals("spring boot", service.normalize("SpringBoot"));
+        assertEquals("javascript", service.normalize("JS"));
+        assertEquals("postgresql", service.normalize("Postgres"));
+        assertEquals("rest api", service.normalize("REST APIs"));
+    }
+
+    @Test
+    void calculateSkillScore_prioritizesRequiredSkillsAndSeparatesGaps() {
+        MatchingService.SkillMatchResult result = MatchingService.calculateSkillScore(
+                Set.of("java", "docker"),
+                Set.of("java", "spring boot"),
+                Set.of("redis", "kafka"));
+
+        assertEquals(1, result.requiredMissing().size());
+        assertEquals(Set.of("redis", "kafka"), result.preferredMissing());
+        assertEquals(35.0, result.score(), 0.001);
     }
 }

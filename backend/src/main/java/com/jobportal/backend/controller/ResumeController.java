@@ -61,6 +61,11 @@ public class ResumeController {
         return getResume(resume.getId());
     }
 
+    @GetMapping("/latest/ai-review")
+    public ResponseEntity<com.jobportal.backend.service.ai.ResumeCoachResult> reviewLatestResume() {
+        return ResponseEntity.ok(resumeService.reviewLatestResume(currentUserId()));
+    }
+
     @GetMapping("/{resumeId}/file")
     public ResponseEntity<Resource> downloadResume(@PathVariable Long resumeId) {
         Resume resume = resumeService.getResumeForUser(resumeId, currentUserId());

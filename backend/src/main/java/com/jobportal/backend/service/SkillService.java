@@ -20,6 +20,23 @@ public class SkillService {
 
     private static final Logger logger = LoggerFactory.getLogger(SkillService.class);
 
+    private static final Map<String, String> ALIASES = Map.ofEntries(
+            Map.entry("js", "javascript"),
+            Map.entry("ts", "typescript"),
+            Map.entry("reactjs", "react"),
+            Map.entry("react.js", "react"),
+            Map.entry("nodejs", "node.js"),
+            Map.entry("postgres", "postgresql"),
+            Map.entry("springboot", "spring boot"),
+            Map.entry("spring-boot", "spring boot"),
+            Map.entry("core java", "java"),
+            Map.entry("java se", "java"),
+            Map.entry("restful api", "rest api"),
+            Map.entry("rest apis", "rest api"),
+            Map.entry("restful apis", "rest api"),
+            Map.entry("k8s", "kubernetes")
+    );
+
     @Autowired
     private SkillRepository skillRepository;
 
@@ -28,7 +45,10 @@ public class SkillService {
      */
     public String normalize(String skillName) {
         if (skillName == null) return "";
-        return skillName.trim().toLowerCase().replaceAll("\\s+", " ");
+        String normalized = skillName.trim().toLowerCase().replaceAll("[._-]+", " ")
+                .replaceAll("\\s+", " ");
+        String compact = normalized.replace(" ", "");
+        return ALIASES.getOrDefault(normalized, ALIASES.getOrDefault(compact, normalized));
     }
 
     /**
