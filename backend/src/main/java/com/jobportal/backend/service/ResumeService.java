@@ -8,6 +8,7 @@ import com.jobportal.backend.model.enums.ResumeStatus;
 import com.jobportal.backend.repository.CandidateRepository;
 import com.jobportal.backend.repository.CandidateSkillRepository;
 import com.jobportal.backend.repository.ResumeRepository;
+import com.jobportal.backend.repository.JobRepository;
 import com.jobportal.backend.service.ai.AiProvider;
 import com.jobportal.backend.service.ai.AiResumeAnalysisResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,6 +55,9 @@ public class ResumeService {
 
     @Autowired
     private ResumeRepository resumeRepository;
+
+    @Autowired
+    private JobRepository jobRepository;
 
     @Autowired
     private CandidateRepository candidateRepository;
@@ -219,6 +223,38 @@ public class ResumeService {
         return resumeRepository.findByUserId(userId).stream()
                 .max(java.util.Comparator.comparing(Resume::getCreatedAt))
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getResumeSummariesForUser(Long userId) {
+        return resumeRepository.findByUserId(userId).stream().map(resume -> {
+            java.util.Map<String, Object> summary = new java.util.LinkedHashMap<>();
+            summary.put("resumeId", resume.getId());
+            summary.put("filename", resume.getOriginalFileName());
+            summary.put("status", resume.getStatus().name());
+            summary.put("fileSize", resume.getFileSize());
+            summary.put("createdAt", resume.getCreatedAt());
+            summary.put("processedAt", resume.getProcessedAt());
+            summary.put("errorMessage", resume.getErrorMessage());
+            return summary;
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public com.jobportal.backend.service.ai.ResumeCoachResult reviewResumeForJob(Long resumeId, Long jobId,
+            Long userId) {
+        Resume resume = getResumeForUser(resumeId, userId);
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+        if (resume.getRawText() == null || resume.getRawText().isBlank()) {
+            throw new BadRequestException("This resume is still processing");
+        }
+        String jobText = String.join("\n", java.util.List.of(
+                job.getTitle(), job.getDescription(),
+                String.join(" ", job.getSkills() == null ? java.util.List.of() : job.getSkills()),
+                String.join(" ", job.getQualifications() == null ? java.util.List.of() : job.getQualifications())));
+        return aiProvider.coachResume(resume.getRawText(), jobText,
+                java.util.Collections.emptyList(), job.getSkills());
     }
 
     @Transactional(readOnly = true)

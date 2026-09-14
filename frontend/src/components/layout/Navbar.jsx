@@ -73,6 +73,7 @@ export default function Navbar() {
       { path: '/jobs', label: 'Find Jobs' },
       { path: '/recommended-jobs', label: 'AI Recommended' },
       { path: '/applied-jobs', label: 'My Applications' },
+      { path: '/resume/library', label: 'Resume Library' },
     ];
   };
 

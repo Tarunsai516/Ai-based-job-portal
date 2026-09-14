@@ -29,6 +29,16 @@ export const candidateService = {
     return response.data;
   },
 
+  getResumes: async () => {
+    const response = await api.get('/resumes');
+    return response.data;
+  },
+
+  reviewResumeForJob: async (resumeId, jobId) => {
+    const response = await api.get(`/resumes/${resumeId}/ai-review/job/${jobId}`);
+    return response.data;
+  },
+
   getLatestResume: async () => {
     const response = await api.get('/resumes/latest');
     return response.status === 204 ? null : response.data;

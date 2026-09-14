@@ -22,6 +22,11 @@ export default function JobDetails() {
   const [candidateProfile, setCandidateProfile] = useState(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchError, setMatchError] = useState(false);
+  const [resumes, setResumes] = useState([]);
+  const [showApplyPanel, setShowApplyPanel] = useState(false);
+  const [selectedResumeId, setSelectedResumeId] = useState('');
+  const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -44,13 +49,17 @@ export default function JobDetails() {
         setCandidateProfile(profile);
         return Promise.all([
           applicationService.getByCandidateId(profile.id),
-          recommendationService.getCandidateJobMatch(profile.id, id)
+          recommendationService.getCandidateJobMatch(profile.id, id),
+          candidateService.getResumes()
         ]);
       })
-      .then(([apps, matchData]) => {
+      .then(([apps, matchData, resumeData]) => {
         const hasApplied = apps.some((app) => String(app.jobId) === String(id));
         setApplied(hasApplied);
         setMatch(matchData);
+        const completedResumes = (resumeData || []).filter(resume => resume.status === 'COMPLETED');
+        setResumes(completedResumes);
+        setSelectedResumeId(String(completedResumes[0]?.resumeId || ''));
       })
       .catch((err) => {
         console.error(err);
@@ -81,8 +90,25 @@ export default function JobDetails() {
     );
   }
 
-  const handleApply = async () => {
+  const openApplyPanel = () => {
     if (applied) return;
+    setShowApplyPanel(true);
+  };
+
+  const analyzeSelectedResume = async () => {
+    if (!selectedResumeId) return;
+    setAnalysisLoading(true);
+    try {
+      setResumeAnalysis(await candidateService.reviewResumeForJob(selectedResumeId, job.id));
+    } catch (err) {
+      setToast({ message: err.response?.data?.message || 'Could not analyze this resume for the job.', type: 'error' });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  const handleApply = async () => {
+    if (applied || !selectedResumeId) return;
     try {
       await applicationService.apply({
         jobId: job.id.toString(),
@@ -93,9 +119,11 @@ export default function JobDetails() {
         candidateName: user.name,
         recruiterId: job.recruiterId,
         recruiterEmail: job.recruiterEmail,
-        matchScore: match?.overallScore ?? null
+        matchScore: match?.overallScore ?? null,
+        resumeId: Number(selectedResumeId)
       });
       setApplied(true);
+      setShowApplyPanel(false);
       setToast({
         message: `Application submitted successfully for ${job.title}!`,
         type: 'success'
@@ -167,7 +195,7 @@ export default function JobDetails() {
             </button>
             {user?.role?.toLowerCase() === 'seeker' && (
               <button
-                onClick={handleApply}
+                onClick={openApplyPanel}
                 disabled={applied}
                 className={`flex-1 md:flex-none px-6 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-all ${
                   applied
@@ -175,11 +203,25 @@ export default function JobDetails() {
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
-                {applied ? 'Applied' : 'Apply Now'}
+                {applied ? 'Applied' : 'Apply with resume'}
               </button>
             )}
           </div>
         </div>
+
+        {showApplyPanel && user?.role?.toLowerCase() === 'seeker' && (
+          <div className="fixed inset-0 z-50 bg-slate-950/50 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Choose resume for application">
+            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6">
+              <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Application ready</p><h2 className="text-2xl font-bold text-slate-950 mt-1">Choose the right resume.</h2><p className="text-sm text-slate-500 mt-2">TalentSync will analyze this version against {job.title} before you submit.</p></div><button onClick={() => setShowApplyPanel(false)} className="text-slate-400 hover:text-slate-900 text-xl" aria-label="Close">×</button></div>
+              {resumes.length === 0 ? <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">Upload and finish processing at least one resume before applying to this role. <Link to="/resume/upload" className="font-bold underline">Upload resume</Link></div> : <>
+                <div className="space-y-2"><label className="eyebrow" htmlFor="application-resume">Resume for this application</label><select id="application-resume" value={selectedResumeId} onChange={event => { setSelectedResumeId(event.target.value); setResumeAnalysis(null); }} className="w-full border border-slate-200 rounded-lg px-3 py-3 text-sm text-slate-900"><option value="">Select a resume</option>{resumes.map(resume => <option key={resume.resumeId} value={resume.resumeId}>{resume.filename}</option>)}</select></div>
+                <button onClick={analyzeSelectedResume} disabled={!selectedResumeId || analysisLoading} className="w-full py-3 rounded-lg border border-blue-200 text-blue-700 text-sm font-bold hover:bg-blue-50 disabled:opacity-50">{analysisLoading ? 'Analyzing resume for this job...' : resumeAnalysis ? 'Re-analyze selected resume' : 'Analyze resume for this job'}</button>
+                {resumeAnalysis && <div className="bg-slate-950 text-white rounded-xl p-5 space-y-4"><div className="flex items-center justify-between"><div><p className="eyebrow text-teal-300">Job-specific AI review</p><p className="text-sm text-slate-300 mt-1">How this resume presents you for {job.title}</p></div><span className="text-3xl font-bold text-teal-300">{resumeAnalysis.resumeScore}<span className="text-xs text-slate-400">/100</span></span></div>{resumeAnalysis.weakSections?.length > 0 && <div><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Improve these sections</p><div className="flex flex-wrap gap-2 mt-2">{resumeAnalysis.weakSections.map(section => <span key={section} className="text-xs px-2 py-1 rounded bg-amber-400/10 text-amber-200">{section}</span>)}</div></div>}{resumeAnalysis.missingKeywords?.length > 0 && <div><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Job keywords to consider</p><p className="text-sm text-slate-200 mt-2">{resumeAnalysis.missingKeywords.join(', ')}</p></div>}{resumeAnalysis.suggestions?.slice(0, 3).map((suggestion, index) => <div key={`${suggestion.section}-${index}`} className="border-t border-slate-800 pt-3"><p className="text-sm font-bold text-white">{suggestion.section || 'Improvement'}</p><p className="text-xs text-slate-300 mt-1">{suggestion.reason}</p>{suggestion.suggestedText && <p className="text-xs text-teal-200 mt-2">{suggestion.suggestedText}</p>}</div>)}</div>}
+                <button onClick={handleApply} disabled={!selectedResumeId} className="w-full py-3 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">Submit application with this resume</button>
+              </>}
+            </div>
+          </div>
+        )}
 
         {/* Job Body content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">

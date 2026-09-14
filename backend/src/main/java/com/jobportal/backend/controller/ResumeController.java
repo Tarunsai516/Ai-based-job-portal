@@ -61,6 +61,17 @@ public class ResumeController {
         return getResume(resume.getId());
     }
 
+    @GetMapping
+    public ResponseEntity<java.util.List<Map<String, Object>>> listResumes() {
+        return ResponseEntity.ok(resumeService.getResumeSummariesForUser(currentUserId()));
+    }
+
+    @GetMapping("/{resumeId}/ai-review/job/{jobId}")
+    public ResponseEntity<com.jobportal.backend.service.ai.ResumeCoachResult> reviewResumeForJob(
+            @PathVariable Long resumeId, @PathVariable Long jobId) {
+        return ResponseEntity.ok(resumeService.reviewResumeForJob(resumeId, jobId, currentUserId()));
+    }
+
     @GetMapping("/latest/ai-review")
     public ResponseEntity<com.jobportal.backend.service.ai.ResumeCoachResult> reviewLatestResume() {
         return ResponseEntity.ok(resumeService.reviewLatestResume(currentUserId()));

@@ -29,6 +29,7 @@ public class Application {
 
     private String appliedDate;
     private int matchScore;
+    private Long resumeId;
     private String candidateId;
     private String candidateName;
     private String recruiterId;
@@ -118,6 +119,14 @@ public class Application {
 
     public void setMatchScore(int matchScore) {
         this.matchScore = matchScore;
+    }
+
+    public Long getResumeId() {
+        return resumeId;
+    }
+
+    public void setResumeId(Long resumeId) {
+        this.resumeId = resumeId;
     }
 
     public String getCandidateId() {
@@ -212,6 +221,7 @@ public class Application {
         private ApplicationStatus status = ApplicationStatus.APPLIED;
         private String appliedDate;
         private int matchScore;
+        private Long resumeId;
         private String candidateId;
         private String candidateName;
         private String recruiterId;
@@ -254,6 +264,11 @@ public class Application {
             return this;
         }
 
+        public Builder resumeId(Long resumeId) {
+            this.resumeId = resumeId;
+            return this;
+        }
+
         public Builder candidateId(String candidateId) {
             this.candidateId = candidateId;
             return this;
@@ -285,8 +300,10 @@ public class Application {
         }
 
         public Application build() {
-            return new Application(id, jobId, jobTitle, companyName, status, appliedDate, matchScore,
+            Application application = new Application(id, jobId, jobTitle, companyName, status, appliedDate, matchScore,
                     candidateId, candidateName, recruiterId, recruiterEmail, createdAt, updatedAt);
+            application.setResumeId(resumeId);
+            return application;
         }
     }
 }

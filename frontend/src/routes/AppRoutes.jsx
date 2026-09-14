@@ -16,6 +16,8 @@ import Profile from '../pages/Profile/Profile';
 import EditProfile from '../pages/Profile/EditProfile';
 import ResumeUpload from '../pages/Candidate/ResumeUpload';
 import MyResume from '../pages/Candidate/MyResume';
+import ResumeLibrary from '../pages/Candidate/ResumeLibrary';
+import ResumeDetail from '../pages/Candidate/ResumeDetail';
 import JobListings from '../pages/Jobs/JobListings';
 import JobDetails from '../pages/Jobs/JobDetails';
 import RecommendedJobs from '../pages/Candidate/RecommendedJobs';
@@ -96,6 +98,14 @@ export default function AppRoutes() {
             <MyResume />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/resume/library"
+        element={<ProtectedRoute allowedRoles={['seeker']}><ResumeLibrary /></ProtectedRoute>}
+      />
+      <Route
+        path="/resume/:resumeId"
+        element={<ProtectedRoute allowedRoles={['seeker']}><ResumeDetail /></ProtectedRoute>}
       />
       <Route
         path="/jobs"

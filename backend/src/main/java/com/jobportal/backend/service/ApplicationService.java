@@ -127,6 +127,7 @@ public class ApplicationService {
                 .status(ApplicationStatus.APPLIED)
                 .appliedDate(request.getAppliedDate() != null ? request.getAppliedDate() : LocalDate.now().toString())
                 .matchScore(calculatedMatchScore)
+                .resumeId(request.getResumeId())
                 .candidateId(request.getCandidateId())
                 .candidateName(request.getCandidateName())
                 .recruiterId(recruiterId)

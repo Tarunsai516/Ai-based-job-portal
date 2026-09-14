@@ -26,6 +26,7 @@ export default function Sidebar() {
     { to: '/jobs', label: 'Find jobs', icon: HiBriefcase },
     { to: '/applied-jobs', label: 'Applications', icon: HiClipboardList },
     { to: '/profile', label: 'Profile & AI insights', icon: HiUser },
+    { to: '/resume/library', label: 'Resume library', icon: HiDocumentText },
   ];
 
   const recruiterLinks = [
