@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -95,6 +96,18 @@ public class ResumeController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"" + resume.getOriginalFileName() + "\"")
                 .body(resource);
+    }
+
+    @PostMapping("/{resumeId}/tailor/{jobId}")
+    public ResponseEntity<Map<String, Object>> tailorResume(@PathVariable Long resumeId, @PathVariable Long jobId) {
+        Resume tailoredResume = resumeService.tailorResume(resumeId, jobId, currentUserId());
+        
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("resumeId", tailoredResume.getId());
+        response.put("filename", tailoredResume.getOriginalFileName());
+        response.put("status", tailoredResume.getStatus().name());
+        
+        return ResponseEntity.ok(response);
     }
 
     private Long currentUserId() {

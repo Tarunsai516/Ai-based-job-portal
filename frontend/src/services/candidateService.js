@@ -39,6 +39,11 @@ export const candidateService = {
     return response.data;
   },
 
+  tailorResume: async (resumeId, jobId) => {
+    const response = await api.post(`/resumes/${resumeId}/tailor/${jobId}`);
+    return response.data;
+  },
+
   getLatestResume: async () => {
     const response = await api.get('/resumes/latest');
     return response.status === 204 ? null : response.data;

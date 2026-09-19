@@ -178,53 +178,155 @@ public class KeywordAiProvider implements AiProvider {
                                           List<String> matchedSkills, List<String> missingSkills) {
         List<ResumeCoachResult.ImprovementSuggestion> suggestions = new ArrayList<>();
         List<String> weakSections = new ArrayList<>();
-        int score = 60; // base score
+        Map<String, Integer> sectionScores = new java.util.LinkedHashMap<>();
 
-        // Check for common resume issues
-        if (resumeText.length() < 500) {
-            weakSections.add("Overall Length");
+        String resumeLower = resumeText.toLowerCase();
+        String jobLower    = (jobDescription != null) ? jobDescription.toLowerCase() : "";
+
+        // ── 1. Summary / Objective section ──────────────────────────────────
+        int summaryScore = 0;
+        boolean hasSummary = resumeLower.contains("summary") || resumeLower.contains("objective") || resumeLower.contains("profile");
+        if (hasSummary) summaryScore += 30;
+        // Length check — a good summary means a detailed resume
+        if (resumeText.length() > 1500) summaryScore += 30;
+        else if (resumeText.length() > 700) summaryScore += 15;
+        // Job title alignment
+        String[] jobWords = jobLower.split("[\\s,;|]+");
+        long titleHits = Arrays.stream(jobWords)
+                .filter(w -> w.length() > 4 && resumeLower.contains(w))
+                .limit(10).count();
+        summaryScore += (int) Math.min(40, titleHits * 5);
+        sectionScores.put("Summary", Math.min(100, summaryScore));
+        if (summaryScore < 50) {
+            weakSections.add("Summary");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
-                    .section("Content")
-                    .reason("Resume is too short. Add more detail about your experience and projects.")
+                    .section("Summary")
+                    .reason("Add a professional summary that mirrors the job title and key responsibilities. "
+                            + "Recruiters spend an average of 7 seconds on the first scan.")
+                    .suggestedText("Results-driven professional with X+ years of experience in [key area] "
+                            + "seeking to contribute [specific value] at [company type].")
                     .build());
-        } else {
-            score += 10;
         }
 
-        // Check for quantified achievements
-        if (!Pattern.compile("\\d+%|\\$\\d+|\\d+\\s*(users|customers|projects|team)", Pattern.CASE_INSENSITIVE)
-                .matcher(resumeText).find()) {
-            weakSections.add("Achievements");
-            suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
-                    .section("Experience")
-                    .reason("Add quantified achievements (e.g., 'Improved performance by 40%', 'Led team of 5').")
-                    .build());
+        // ── 2. Skills section ────────────────────────────────────────────────
+        int skillsScore = 0;
+        int totalJobSkills = (missingSkills != null ? missingSkills.size() : 0)
+                           + (matchedSkills != null ? matchedSkills.size() : 0);
+        int matched = (matchedSkills != null) ? matchedSkills.size() : 0;
+        if (totalJobSkills > 0) {
+            skillsScore = (int) (((double) matched / totalJobSkills) * 80);
         } else {
-            score += 10;
+            skillsScore = resumeLower.contains("skill") ? 50 : 30;
         }
-
-        // Missing skills suggestions
-        if (missingSkills != null && !missingSkills.isEmpty()) {
-            score -= missingSkills.size() * 3;
+        // Bonus for having a dedicated skills section
+        if (resumeLower.contains("technical skills") || resumeLower.contains("core competencies")) skillsScore += 15;
+        sectionScores.put("Skills", Math.min(100, skillsScore));
+        if (skillsScore < 60) {
+            weakSections.add("Skills");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Skills")
-                    .reason("Consider learning and adding these missing skills: " + String.join(", ", missingSkills))
+                    .reason("Your resume is missing key skills required for this role: "
+                            + (missingSkills != null && !missingSkills.isEmpty()
+                               ? String.join(", ", missingSkills.stream().limit(6).toList())
+                               : "several job-required skills are not visible."))
                     .build());
         }
 
-        // Matched skills bonus
-        if (matchedSkills != null) {
-            score += matchedSkills.size() * 2;
+        // ── 3. Experience section ────────────────────────────────────────────
+        int expScore = 0;
+        // Quantified achievements are the strongest signal
+        boolean hasNumbers = Pattern.compile("\\d+%|\\$\\d+|\\d+\\s*(users|customers|projects|team|engineers|clients|revenue|ms|million|billion)",
+                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
+        if (hasNumbers) expScore += 35;
+        // Action verb richness
+        String[] actionVerbs = {"led", "built", "designed", "architected", "improved", "reduced",
+                "increased", "launched", "delivered", "managed", "mentored", "scaled", "optimized",
+                "implemented", "developed", "created", "deployed", "automated", "collaborated"};
+        long verbCount = Arrays.stream(actionVerbs).filter(resumeLower::contains).count();
+        expScore += (int) Math.min(35, verbCount * 3);
+        // Experience keyword match with job
+        if (jobLower.length() > 0) {
+            String[] expKeywords = {"experience", "year", "worked", "developed", "contributed"};
+            long expHits = Arrays.stream(expKeywords).filter(k -> resumeLower.contains(k) && jobLower.contains(k)).count();
+            expScore += (int) Math.min(30, expHits * 8);
+        } else {
+            if (resumeLower.contains("experience")) expScore += 20;
+        }
+        sectionScores.put("Experience", Math.min(100, expScore));
+        if (!hasNumbers) {
+            weakSections.add("Experience");
+            suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
+                    .section("Experience")
+                    .reason("Add quantified achievements with specific numbers. "
+                            + "E.g., 'Reduced API latency by 40%' or 'Led a team of 6 engineers to deliver X on schedule.'")
+                    .suggestedText("Use the format: [Action verb] + [What you did] + [Result with a number]")
+                    .build());
         }
 
-        score = Math.max(20, Math.min(100, score));
+        // ── 4. Education section ─────────────────────────────────────────────
+        int eduScore = 0;
+        boolean hasDegree = Pattern.compile("bachelor|master|phd|mba|b\\.s|m\\.s|b\\.e|m\\.e|diploma|associate",
+                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
+        if (hasDegree) eduScore += 60;
+        boolean hasInstitution = Pattern.compile("university|college|institute|school",
+                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
+        if (hasInstitution) eduScore += 25;
+        boolean hasGradYear = Pattern.compile("20[0-2]\\d|19[89]\\d").matcher(resumeText).find();
+        if (hasGradYear) eduScore += 15;
+        sectionScores.put("Education", Math.min(100, eduScore));
+        if (eduScore < 40) {
+            weakSections.add("Education");
+            suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
+                    .section("Education")
+                    .reason("Make sure your highest degree, institution name, field of study, and graduation year are clearly stated.")
+                    .build());
+        }
+
+        // ── 5. Projects & Certifications ────────────────────────────────────
+        int projectScore = 0;
+        boolean hasProjects = resumeLower.contains("project") || resumeLower.contains("portfolio") || resumeLower.contains("github");
+        if (hasProjects) projectScore += 40;
+        boolean hasCerts = resumeLower.contains("certified") || resumeLower.contains("certification") || resumeLower.contains("certificate");
+        if (hasCerts) projectScore += 40;
+        boolean hasLinks = resumeLower.contains("linkedin") || resumeLower.contains("github.com") || resumeLower.contains("http");
+        if (hasLinks) projectScore += 20;
+        sectionScores.put("Projects & Certifications", Math.min(100, projectScore));
+        if (!hasProjects && !hasCerts) {
+            suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
+                    .section("Projects & Certifications")
+                    .reason("Add 2–3 portfolio projects or relevant certifications. "
+                            + "These are strong differentiators when your work experience is limited.")
+                    .build());
+        }
+
+        // ── Overall weighted score ───────────────────────────────────────────
+        int overall = (int) (
+            sectionScores.get("Summary")                    * 0.15 +
+            sectionScores.get("Skills")                     * 0.30 +
+            sectionScores.get("Experience")                 * 0.35 +
+            sectionScores.get("Education")                  * 0.12 +
+            sectionScores.get("Projects & Certifications")  * 0.08
+        );
+        overall = Math.max(15, Math.min(100, overall));
 
         return ResumeCoachResult.builder()
-                .resumeScore(score)
+                .resumeScore(overall)
                 .missingKeywords(missingSkills != null ? missingSkills : List.of())
                 .weakSections(weakSections)
                 .suggestions(suggestions)
+                .sectionScores(sectionScores)
                 .build();
+    }
+
+    @Override
+    public String tailorResume(String resumeText, String jobDescription) {
+        return "TAILORED RESUME\n\n" +
+                "Summary:\nResults-driven professional with experience tailored to the requirements of the job. " +
+                "Proven ability to deliver impactful solutions.\n\n" +
+                "Experience:\n" +
+                "- Leveraged key skills to achieve strategic objectives.\n" +
+                "- Collaborated with cross-functional teams to drive success.\n\n" +
+                "Note: This is a mock tailored resume generated by KeywordAiProvider because OpenAI is not configured.";
     }
 
     @Override

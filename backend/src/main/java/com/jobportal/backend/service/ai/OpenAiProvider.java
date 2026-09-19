@@ -74,23 +74,52 @@ public class OpenAiProvider implements AiProvider {
     public ResumeCoachResult coachResume(String resumeText, String jobDescription,
                                          List<String> matchedSkills, List<String> missingSkills) {
         try {
-            String json = requestJson("Review a resume and return an actionable score", """
+            String systemPrompt = "You are TalentSync AI, an expert resume coach and recruiter. "
+                    + "Analyze the resume against the job description. "
+                    + "Score each section independently from 0-100 based on how well the resume content "
+                    + "matches the specific job requirements. Different resumes will have genuinely different scores. "
+                    + "Be accurate, evidence-based, and strict: do NOT round all scores to similar values. "
+                    + "Return ONLY the JSON object, no extra text.";
+
+            String schema = """
                     {
                       "resumeScore": 0,
+                      "sectionScores": {
+                        "Summary": 0,
+                        "Skills": 0,
+                        "Experience": 0,
+                        "Education": 0,
+                        "Projects & Certifications": 0
+                      },
                       "missingKeywords": [],
                       "weakSections": [],
                       "suggestions": [{
-                        "section":"",
-                        "currentText":"",
-                        "suggestedText":"",
-                        "reason":""
+                        "section": "",
+                        "currentText": "",
+                        "suggestedText": "",
+                        "reason": ""
                       }]
                     }
-                    """, "Resume:\n" + safeText(resumeText) + "\nJob description:\n"
-                    + safeText(jobDescription) + "\nMatched skills: " + safeList(matchedSkills)
-                    + "\nMissing skills: " + safeList(missingSkills));
+                    """;
+
+            String userInput = "RESUME:\n" + safeText(resumeText)
+                    + "\n\nJOB DESCRIPTION:\n" + safeText(jobDescription)
+                    + "\n\nMatched skills (already in resume): " + safeList(matchedSkills)
+                    + "\nMissing skills (NOT in resume but required by job): " + safeList(missingSkills)
+                    + "\n\nInstructions:\n"
+                    + "1. resumeScore = weighted average: Skills(30%) + Experience(35%) + Summary(15%) + Education(12%) + Projects(8%)\n"
+                    + "2. sectionScores: score each section 0-100 based on how well THIS specific resume matches THIS specific job\n"
+                    + "3. missingKeywords: list exact keywords from the job description absent from the resume\n"
+                    + "4. weakSections: section names that scored below 60\n"
+                    + "5. suggestions: provide 3-5 specific, actionable improvements with suggestedText rewrites where possible";
+
+            String json = request(systemPrompt, schema, userInput, true);
             ResumeCoachResult result = objectMapper.readValue(json, ResumeCoachResult.class);
             result.setResumeScore(Math.max(0, Math.min(100, result.getResumeScore())));
+            // Clamp section scores
+            if (result.getSectionScores() != null) {
+                result.getSectionScores().replaceAll((k, v) -> Math.max(0, Math.min(100, v)));
+            }
             return result;
         } catch (Exception ex) {
             logger.warn("OpenAI resume review unavailable; using deterministic fallback: {}", ex.getMessage());
@@ -123,6 +152,20 @@ public class OpenAiProvider implements AiProvider {
         } catch (Exception ex) {
             logger.warn("OpenAI career assistant unavailable; using deterministic fallback: {}", ex.getMessage());
             return fallback.answerCandidateQuestion(question, candidateContext, jobContext, matchContext);
+        }
+    }
+
+    @Override
+    public String tailorResume(String resumeText, String jobDescription) {
+        if (!isAvailable()) return fallback.tailorResume(resumeText, jobDescription);
+        try {
+            return requestText("Tailor this resume to match the job description.", 
+                    "Rewrite the summary and experience bullets to strongly align with the job description. Do not fabricate experience. Format as clean text.\n\n"
+                    + "Original Resume: " + safeText(resumeText) + "\n\n"
+                    + "Job Description: " + safeText(jobDescription));
+        } catch (Exception ex) {
+            logger.warn("OpenAI tailor unavailable; using fallback: {}", ex.getMessage());
+            return fallback.tailorResume(resumeText, jobDescription);
         }
     }
 

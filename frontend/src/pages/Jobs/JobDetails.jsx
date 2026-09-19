@@ -7,7 +7,8 @@ import { applicationService } from '../../services/applicationService';
 import { candidateService } from '../../services/candidateService';
 import { recommendationService } from '../../services/recommendationService';
 import { useAuth } from '../../context/AuthContext';
-import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare } from 'react-icons/hi';
+import { HiLocationMarker, HiCurrencyDollar, HiBriefcase, HiMail, HiChevronLeft, HiShare,
+  HiOutlineUser, HiOutlineChip, HiOutlineBriefcase, HiOutlineAcademicCap, HiOutlineTerminal } from 'react-icons/hi';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function JobDetails() {
@@ -27,6 +28,7 @@ export default function JobDetails() {
   const [selectedResumeId, setSelectedResumeId] = useState('');
   const [resumeAnalysis, setResumeAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [isTailoring, setIsTailoring] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -57,7 +59,7 @@ export default function JobDetails() {
         const hasApplied = apps.some((app) => String(app.jobId) === String(id));
         setApplied(hasApplied);
         setMatch(matchData);
-        const completedResumes = (resumeData || []).filter(resume => resume.status === 'COMPLETED');
+        const completedResumes = (resumeData || []).filter(resume => resume.status === 'COMPLETED' || resume.status === 'PROCESSED');
         setResumes(completedResumes);
         setSelectedResumeId(String(completedResumes[0]?.resumeId || ''));
       })
@@ -104,6 +106,26 @@ export default function JobDetails() {
       setToast({ message: err.response?.data?.message || 'Could not analyze this resume for the job.', type: 'error' });
     } finally {
       setAnalysisLoading(false);
+    }
+  };
+
+  const handleTailor = async () => {
+    if (!selectedResumeId) return;
+    setIsTailoring(true);
+    setToast({ message: 'AI is tailoring your resume... This may take a few seconds.', type: 'info' });
+    try {
+      const newResume = await candidateService.tailorResume(selectedResumeId, job.id);
+      
+      const updatedResumes = await candidateService.getResumes();
+      const completedResumes = updatedResumes.filter(r => r.status === 'COMPLETED' || r.status === 'PROCESSED');
+      setResumes(completedResumes);
+      setSelectedResumeId(String(newResume.resumeId));
+      
+      setToast({ message: 'Resume tailored successfully! It is now selected.', type: 'success' });
+    } catch (err) {
+      setToast({ message: err.response?.data?.message || 'Failed to tailor resume.', type: 'error' });
+    } finally {
+      setIsTailoring(false);
     }
   };
 
@@ -199,8 +221,8 @@ export default function JobDetails() {
                 disabled={applied}
                 className={`flex-1 md:flex-none px-6 py-2.5 text-xs font-bold rounded-lg shadow-sm transition-all ${
                   applied
-                    ? 'bg-gray-100 text-gray-400 border border-gray-250 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    ? 'bg-slate-100 text-slate-400 border border-slate-250 cursor-not-allowed'
+                    : 'bg-primary hover:opacity-90 text-white hover:shadow-md hover:-translate-y-0.5'
                 }`}
               >
                 {applied ? 'Applied' : 'Apply with resume'}
@@ -210,15 +232,209 @@ export default function JobDetails() {
         </div>
 
         {showApplyPanel && user?.role?.toLowerCase() === 'seeker' && (
-          <div className="fixed inset-0 z-50 bg-slate-950/50 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Choose resume for application">
-            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 md:p-8 space-y-6">
-              <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Application ready</p><h2 className="text-2xl font-bold text-slate-950 mt-1">Choose the right resume.</h2><p className="text-sm text-slate-500 mt-2">TalentSync will analyze this version against {job.title} before you submit.</p></div><button onClick={() => setShowApplyPanel(false)} className="text-slate-400 hover:text-slate-900 text-xl" aria-label="Close">×</button></div>
-              {resumes.length === 0 ? <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">Upload and finish processing at least one resume before applying to this role. <Link to="/resume/upload" className="font-bold underline">Upload resume</Link></div> : <>
-                <div className="space-y-2"><label className="eyebrow" htmlFor="application-resume">Resume for this application</label><select id="application-resume" value={selectedResumeId} onChange={event => { setSelectedResumeId(event.target.value); setResumeAnalysis(null); }} className="w-full border border-slate-200 rounded-lg px-3 py-3 text-sm text-slate-900"><option value="">Select a resume</option>{resumes.map(resume => <option key={resume.resumeId} value={resume.resumeId}>{resume.filename}</option>)}</select></div>
-                <button onClick={analyzeSelectedResume} disabled={!selectedResumeId || analysisLoading} className="w-full py-3 rounded-lg border border-blue-200 text-blue-700 text-sm font-bold hover:bg-blue-50 disabled:opacity-50">{analysisLoading ? 'Analyzing resume for this job...' : resumeAnalysis ? 'Re-analyze selected resume' : 'Analyze resume for this job'}</button>
-                {resumeAnalysis && <div className="bg-slate-950 text-white rounded-xl p-5 space-y-4"><div className="flex items-center justify-between"><div><p className="eyebrow text-teal-300">Job-specific AI review</p><p className="text-sm text-slate-300 mt-1">How this resume presents you for {job.title}</p></div><span className="text-3xl font-bold text-teal-300">{resumeAnalysis.resumeScore}<span className="text-xs text-slate-400">/100</span></span></div>{resumeAnalysis.weakSections?.length > 0 && <div><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Improve these sections</p><div className="flex flex-wrap gap-2 mt-2">{resumeAnalysis.weakSections.map(section => <span key={section} className="text-xs px-2 py-1 rounded bg-amber-400/10 text-amber-200">{section}</span>)}</div></div>}{resumeAnalysis.missingKeywords?.length > 0 && <div><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Job keywords to consider</p><p className="text-sm text-slate-200 mt-2">{resumeAnalysis.missingKeywords.join(', ')}</p></div>}{resumeAnalysis.suggestions?.slice(0, 3).map((suggestion, index) => <div key={`${suggestion.section}-${index}`} className="border-t border-slate-800 pt-3"><p className="text-sm font-bold text-white">{suggestion.section || 'Improvement'}</p><p className="text-xs text-slate-300 mt-1">{suggestion.reason}</p>{suggestion.suggestedText && <p className="text-xs text-teal-200 mt-2">{suggestion.suggestedText}</p>}</div>)}</div>}
-                <button onClick={handleApply} disabled={!selectedResumeId} className="w-full py-3 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-50">Submit application with this resume</button>
-              </>}
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Choose resume for application">
+            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-5 flex items-start justify-between gap-4 rounded-t-2xl z-10">
+                <div>
+                  <p className="eyebrow">Application ready</p>
+                  <h2 className="text-xl font-bold text-slate-950 mt-1">Pick the best resume for this role.</h2>
+                  <p className="text-xs text-slate-500 mt-1">TalentSync analyzes your resume section-by-section against <strong>{job.title}</strong> and shows exactly where to improve.</p>
+                </div>
+                <button onClick={() => setShowApplyPanel(false)} className="text-slate-400 hover:text-slate-900 text-2xl flex-shrink-0 leading-none" aria-label="Close">×</button>
+              </div>
+
+              <div className="p-6 md:p-8 space-y-6">
+                {resumes.length === 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                    Upload and finish processing at least one resume before applying. <Link to="/resume/upload" className="font-bold underline">Upload resume →</Link>
+                  </div>
+                ) : (
+                  <>
+                    {/* Resume selector */}
+                    <div className="space-y-2">
+                      <label className="eyebrow" htmlFor="application-resume">Select a resume to apply with</label>
+                      <select
+                        id="application-resume"
+                        value={selectedResumeId}
+                        onChange={event => { setSelectedResumeId(event.target.value); setResumeAnalysis(null); }}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Choose a resume...</option>
+                        {resumes.map(resume => (
+                          <option key={resume.resumeId} value={resume.resumeId}>{resume.filename}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Analyze button */}
+                    <button
+                      onClick={analyzeSelectedResume}
+                      disabled={!selectedResumeId || analysisLoading}
+                      className="w-full py-3 rounded-xl border-2 border-blue-200 text-blue-700 text-sm font-bold hover:bg-blue-50 hover:border-blue-400 disabled:opacity-40 transition-all"
+                    >
+                      {analysisLoading
+                        ? '🔍 Analyzing your resume against this job...'
+                        : resumeAnalysis
+                          ? '↺ Re-analyze with this resume'
+                          : '✦ Analyze resume for this specific job'}
+                    </button>
+
+                    {/* ── Analysis Results ───────────────────────────────── */}
+                    {resumeAnalysis && (
+                      <div className="space-y-4">
+
+                        {/* Overall score banner */}
+                        <div className="bg-slate-950 text-white rounded-2xl p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-teal-300">Resume Score</p>
+                              <p className="text-xs text-slate-400 mt-0.5">How well this resume matches {job.title}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-4xl font-black text-teal-300">{resumeAnalysis.resumeScore}</span>
+                              <span className="text-sm text-slate-400">/100</span>
+                            </div>
+                          </div>
+                          {/* Overall score bar */}
+                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{
+                                width: `${resumeAnalysis.resumeScore}%`,
+                                background: resumeAnalysis.resumeScore >= 75 ? '#34d399'
+                                          : resumeAnalysis.resumeScore >= 50 ? '#60a5fa'
+                                          : '#fbbf24'
+                              }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1.5">
+                            {resumeAnalysis.resumeScore >= 80 ? '✓ Strong match — submit with confidence'
+                           : resumeAnalysis.resumeScore >= 60 ? '~ Good match — a few improvements will help'
+                           : '⚠ Low match — review the suggestions below before submitting'}
+                          </p>
+                        </div>
+
+                        {/* Section-wise scores */}
+                        {resumeAnalysis.sectionScores && Object.keys(resumeAnalysis.sectionScores).length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Section-by-Section Breakdown</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                              {Object.entries(resumeAnalysis.sectionScores).map(([section, score]) => {
+                                const pct = Math.min(100, Math.max(0, Number(score)));
+                                const color = pct >= 75 ? '#34d399' : pct >= 50 ? '#60a5fa' : '#fbbf24';
+                                const bg = pct >= 75 ? 'bg-emerald-50 border-emerald-100' : pct >= 50 ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100';
+                                const textColor = pct >= 75 ? 'text-emerald-700' : pct >= 50 ? 'text-blue-700' : 'text-amber-700';
+                                const weakLabel = pct < 50 ? 'Needs work' : pct < 75 ? 'Good' : 'Strong';
+                                
+                                let Icon = HiOutlineUser;
+                                if (section.toLowerCase().includes('skill')) Icon = HiOutlineChip;
+                                else if (section.toLowerCase().includes('exp')) Icon = HiOutlineBriefcase;
+                                else if (section.toLowerCase().includes('edu')) Icon = HiOutlineAcademicCap;
+                                else if (section.toLowerCase().includes('proj')) Icon = HiOutlineTerminal;
+
+                                return (
+                                  <div key={section} className={`border rounded-xl p-3 flex flex-col justify-between ${bg}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Icon className={`h-4 w-4 ${textColor}`} />
+                                      <span className={`text-xs font-bold ${textColor}`}>{section}</span>
+                                    </div>
+                                    <div className="flex items-end justify-between mt-1">
+                                      <span className={`text-xl font-black ${textColor}`}>{pct}<span className="text-[10px] font-semibold opacity-70">/100</span></span>
+                                      <span className={`text-[10px] font-bold ${textColor} opacity-80 uppercase`}>{weakLabel}</span>
+                                    </div>
+                                    <div className="h-1 bg-black/10 rounded-full overflow-hidden mt-2">
+                                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Weak sections pills */}
+                        {resumeAnalysis.weakSections?.length > 0 && (
+                          <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2">
+                            <p className="text-[10px] uppercase tracking-wider text-amber-600 font-bold">Sections to improve</p>
+                            <div className="flex flex-wrap gap-2">
+                              {resumeAnalysis.weakSections.map(section => (
+                                <span key={section} className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold border border-amber-200">
+                                  {section}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Missing keywords */}
+                        {resumeAnalysis.missingKeywords?.length > 0 && (
+                          <div className="border border-slate-200 rounded-xl p-4 space-y-2">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Job keywords not in your resume</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {resumeAnalysis.missingKeywords.map(kw => (
+                                <span key={kw} className="text-xs px-2 py-0.5 rounded border border-red-200 text-red-600 bg-red-50 font-medium">
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Per-section suggestions */}
+                        {resumeAnalysis.suggestions?.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Targeted Improvements</p>
+                            {resumeAnalysis.suggestions.map((suggestion, index) => (
+                              <div key={`${suggestion.section}-${index}`} className="border border-slate-200 rounded-xl p-4 space-y-2 hover:border-blue-300 transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <span className="h-5 w-5 bg-blue-50 border border-blue-100 rounded flex items-center justify-center text-[9px] font-black text-blue-600">{index + 1}</span>
+                                  <p className="text-xs font-bold text-slate-800">{suggestion.section || 'General'}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 leading-relaxed">{suggestion.reason}</p>
+                                {suggestion.suggestedText && (
+                                  <div className="bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+                                    <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-1">Suggested rewrite</p>
+                                    <p className="text-xs text-teal-800 leading-relaxed italic">"{suggestion.suggestedText}"</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Submit & Tailor buttons */}
+                    <div className="space-y-3 mt-6">
+                      <button
+                        type="button"
+                        onClick={handleTailor}
+                        disabled={isTailoring || !selectedResumeId}
+                        className="w-full py-3.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 text-sm font-bold hover:bg-purple-100 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isTailoring ? (
+                           <>
+                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-700 border-t-transparent" />
+                             Tailoring...
+                           </>
+                        ) : (
+                           <>
+                             <span className="text-lg">✨</span> 1-Click AI Resume Tailor
+                           </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleApply}
+                        disabled={!selectedResumeId}
+                        className="w-full py-3.5 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-colors shadow-sm hover:shadow-md"
+                      >
+                        Submit application with this resume
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -268,6 +484,24 @@ export default function JobDetails() {
                 </ul>
               </div>
             )}
+
+            {/* Culture Bites */}
+            <div className="space-y-4 pt-8 border-t border-slate-100 mt-8">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                Culture & Day-in-the-Life <span className="bg-accent/10 text-accent text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest">Video</span>
+              </h2>
+              <div className="relative rounded-3xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center group cursor-pointer shadow-lg border border-slate-200/50">
+                <img src={`https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80`} alt="Culture Video" className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
+                <div className="relative z-10 w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:bg-accent transition-all duration-300 group-hover:scale-110 shadow-2xl">
+                   <div className="w-0 h-0 border-t-[10px] border-t-transparent border-l-[18px] border-l-white border-b-[10px] border-b-transparent ml-2"></div>
+                </div>
+                <div className="absolute bottom-6 left-6 right-6">
+                  <p className="text-white font-bold text-lg leading-tight">Hear directly from the engineering team you'll be joining.</p>
+                  <p className="text-slate-300 text-xs mt-1">2:45 min • Behind the scenes</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Sidebar Info (Skills, Recruiter Details) */}

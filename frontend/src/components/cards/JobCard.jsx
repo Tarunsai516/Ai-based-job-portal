@@ -12,7 +12,7 @@ export default function JobCard({ job, onApply, isApplied = false }) {
   };
 
   return (
-    <div className="surface p-5 hover:-translate-y-0.5 hover:border-blue-300 transition-all duration-200 relative flex flex-col justify-between">
+    <div className="surface surface-float p-6 hover:border-indigo-300 relative flex flex-col justify-between group">
       
       {/* Header Info */}
       <div>
@@ -30,10 +30,10 @@ export default function JobCard({ job, onApply, isApplied = false }) {
           </div>
           <button
             onClick={() => setSaved(!saved)}
-            className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
+            className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
           >
             {saved ? (
-              <HiBookmark className="h-5 w-5 text-blue-600" />
+              <HiBookmark className="h-5 w-5 text-indigo-600" />
             ) : (
               <HiOutlineBookmark className="h-5 w-5" />
             )}
@@ -90,10 +90,10 @@ export default function JobCard({ job, onApply, isApplied = false }) {
         <button
           onClick={() => onApply(job)}
           disabled={isApplied}
-          className={`flex-1 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all ${
+          className={`flex-1 py-2 text-xs font-bold rounded-xl shadow-sm transition-all ${
             isApplied
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-              : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow'
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              : 'bg-primary hover:opacity-90 text-white hover:shadow-md hover:-translate-y-0.5'
           }`}
         >
           {isApplied ? 'Applied' : 'Apply Now'}

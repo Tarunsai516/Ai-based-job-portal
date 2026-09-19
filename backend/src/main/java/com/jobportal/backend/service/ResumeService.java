@@ -77,6 +77,9 @@ public class ResumeService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private PdfGenerationService pdfGenerationService;
+
     private final Tika tika = new Tika();
 
     /**
@@ -249,12 +252,31 @@ public class ResumeService {
         if (resume.getRawText() == null || resume.getRawText().isBlank()) {
             throw new BadRequestException("This resume is still processing");
         }
-        String jobText = String.join("\n", java.util.List.of(
-                job.getTitle(), job.getDescription(),
-                String.join(" ", job.getSkills() == null ? java.util.List.of() : job.getSkills()),
-                String.join(" ", job.getQualifications() == null ? java.util.List.of() : job.getQualifications())));
-        return aiProvider.coachResume(resume.getRawText(), jobText,
-                java.util.Collections.emptyList(), job.getSkills());
+        // Build rich job context including all structured fields for accurate per-resume analysis
+        java.util.List<String> jobParts = new java.util.ArrayList<>();
+        jobParts.add("Job Title: " + job.getTitle());
+        if (job.getDescription() != null)    jobParts.add("Description: " + job.getDescription());
+        if (job.getSkills() != null && !job.getSkills().isEmpty())
+            jobParts.add("Required Skills: " + String.join(", ", job.getSkills()));
+        if (job.getResponsibilities() != null && !job.getResponsibilities().isEmpty())
+            jobParts.add("Key Responsibilities:\n- " + String.join("\n- ", job.getResponsibilities()));
+        if (job.getQualifications() != null && !job.getQualifications().isEmpty())
+            jobParts.add("Requirements & Qualifications:\n- " + String.join("\n- ", job.getQualifications()));
+        if (job.getBenefits() != null && !job.getBenefits().isEmpty())
+            jobParts.add("Benefits: " + String.join(", ", job.getBenefits()));
+        String jobText = String.join("\n\n", jobParts);
+
+        // Compute matched and missing skills from resume raw text — different per resume
+        java.util.List<String> jobSkills = job.getSkills() != null ? job.getSkills() : java.util.Collections.emptyList();
+        String resumeLower = resume.getRawText().toLowerCase();
+        java.util.List<String> matchedSkills = jobSkills.stream()
+                .filter(skill -> resumeLower.contains(skill.toLowerCase()))
+                .collect(java.util.stream.Collectors.toList());
+        java.util.List<String> missingSkills = jobSkills.stream()
+                .filter(skill -> !resumeLower.contains(skill.toLowerCase()))
+                .collect(java.util.stream.Collectors.toList());
+
+        return aiProvider.coachResume(resume.getRawText(), jobText, matchedSkills, missingSkills);
     }
 
     @Transactional(readOnly = true)
@@ -344,6 +366,70 @@ public class ResumeService {
             }
             candidateRepository.save(candidate);
         });
+    }
+
+    /**
+     * Tailor a resume to a specific job and save it as a new PDF.
+     */
+    @Transactional
+    public Resume tailorResume(Long resumeId, Long jobId, Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate profile not found for user: " + userId));
+        Long candidateId = candidate.getId();
+
+        Resume original = resumeRepository.findById(resumeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resume not found: " + resumeId));
+                
+        if (!original.getCandidateId().equals(candidateId)) {
+            throw new BadRequestException("Not authorized to tailor this resume");
+        }
+                
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
+        // 1. Get AI tailored text
+        String tailoredText = aiProvider.tailorResume(original.getRawText(), job.getDescription());
+        
+        // 2. Generate PDF
+        String baseName = original.getOriginalFileName();
+        if (baseName != null && baseName.toLowerCase().endsWith(".pdf")) {
+            baseName = baseName.substring(0, baseName.length() - 4);
+        } else if (baseName != null && baseName.toLowerCase().endsWith(".docx")) {
+            baseName = baseName.substring(0, baseName.length() - 5);
+        } else if (baseName == null) {
+            baseName = "Resume";
+        }
+        
+        String newOriginalName = baseName + "-v" + (System.currentTimeMillis() % 1000) + ".pdf";
+        String storedFilename = UUID.randomUUID() + ".pdf";
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath();
+        Path filePath = uploadPath.resolve(storedFilename);
+        
+        try {
+            pdfGenerationService.generatePdfFromText(tailoredText, filePath);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate PDF for tailored resume", e);
+        }
+        
+        // 3. Save new Resume entity
+        Resume tailoredResume = Resume.builder()
+                .candidateId(candidateId)
+                .userId(userId)
+                .originalFileName(newOriginalName)
+                .storedFileName(storedFilename)
+                .storedPath(filePath.toString())
+                .contentType("application/pdf")
+                .fileSize(filePath.toFile().length())
+                .status(ResumeStatus.COMPLETED)
+                .rawText(tailoredText)
+                .build();
+                
+        tailoredResume = resumeRepository.save(tailoredResume);
+        
+        auditService.log(AuditAction.RESUME_UPLOADED, "Resume", String.valueOf(tailoredResume.getId()),
+                "Tailored from " + resumeId + " for Job " + jobId);
+                
+        return tailoredResume;
     }
 
     private void validateFile(MultipartFile file) {

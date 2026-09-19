@@ -24,6 +24,11 @@ public interface AiProvider {
     ResumeCoachResult coachResume(String resumeText, String jobDescription, List<String> matchedSkills, List<String> missingSkills);
 
     /**
+     * Tailor a resume to match a specific job description.
+     */
+    String tailorResume(String resumeText, String jobDescription);
+
+    /**
      * Answer a candidate's question using their profile, resume, and job context (Job Copilot / RAG).
      */
     String answerCandidateQuestion(String question, String candidateContext, String jobContext, String matchContext);

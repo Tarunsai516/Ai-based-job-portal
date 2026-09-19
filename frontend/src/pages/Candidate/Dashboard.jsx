@@ -13,8 +13,10 @@ import {
   HiOutlineDocumentText, HiOutlineClipboardList,
   HiOutlineChatAlt2, HiOutlineSparkles,
   HiOutlineBriefcase, HiOutlineCheckCircle,
-  HiOutlineArrowRight, HiOutlineClock, HiLocationMarker, HiCurrencyDollar
+  HiOutlineArrowRight, HiOutlineClock, HiLocationMarker, HiCurrencyDollar,
+  HiOutlineLocationMarker
 } from 'react-icons/hi';
+import ApplicationTimeline from '../../components/common/ApplicationTimeline';
 
 export default function CandidateDashboard() {
   const { user } = useAuth();
@@ -320,7 +322,7 @@ export default function CandidateDashboard() {
           <div className="space-y-6">
 
             {/* Applications Progress Card */}
-            <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm space-y-4">
+            <div className="surface p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                 <h2 className="text-sm font-bold text-gray-900 flex items-center space-x-1">
                   <HiOutlineBriefcase className="h-4 w-4 text-emerald-600" />
@@ -367,9 +369,14 @@ export default function CandidateDashboard() {
               )}
             </div>
 
+            {/* Most Recent Application Tracker */}
+            {applications.length > 0 && !loading && (
+              <ApplicationTimeline currentStatus={applications[0].status || 'Applied'} />
+            )}
+
             {/* Recent Activity Timeline */}
             {analytics?.recentActivity?.length > 0 && (
-              <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm space-y-4">
+              <div className="surface p-6 space-y-4">
                 <h3 className="text-sm font-bold text-gray-900 flex items-center space-x-1">
                   <HiOutlineClock className="h-4 w-4 text-blue-600" />
                   <span>Recent Activity</span>

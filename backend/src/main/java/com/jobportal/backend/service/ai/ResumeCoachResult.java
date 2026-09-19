@@ -1,24 +1,31 @@
 package com.jobportal.backend.service.ai;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Result of resume coaching / improvement analysis.
+ * Now includes per-section scores so the frontend can show a granular
+ * breakdown (e.g. Summary: 45/100, Skills: 80/100, Experience: 55/100).
  */
 public class ResumeCoachResult {
     private int resumeScore;
     private List<String> missingKeywords;
     private List<String> weakSections;
     private List<ImprovementSuggestion> suggestions;
+    /** Per-section scores (section name → 0-100).  E.g. {"Summary": 45, "Skills": 80} */
+    private Map<String, Integer> sectionScores;
 
     public ResumeCoachResult() {}
 
     public ResumeCoachResult(int resumeScore, List<String> missingKeywords,
-                             List<String> weakSections, List<ImprovementSuggestion> suggestions) {
+                             List<String> weakSections, List<ImprovementSuggestion> suggestions,
+                             Map<String, Integer> sectionScores) {
         this.resumeScore = resumeScore;
         this.missingKeywords = missingKeywords;
         this.weakSections = weakSections;
         this.suggestions = suggestions;
+        this.sectionScores = sectionScores;
     }
 
     public int getResumeScore() { return resumeScore; }
@@ -33,6 +40,9 @@ public class ResumeCoachResult {
     public List<ImprovementSuggestion> getSuggestions() { return suggestions; }
     public void setSuggestions(List<ImprovementSuggestion> suggestions) { this.suggestions = suggestions; }
 
+    public Map<String, Integer> getSectionScores() { return sectionScores; }
+    public void setSectionScores(Map<String, Integer> sectionScores) { this.sectionScores = sectionScores; }
+
     public static Builder builder() { return new Builder(); }
 
     public static class Builder {
@@ -40,14 +50,16 @@ public class ResumeCoachResult {
         private List<String> missingKeywords;
         private List<String> weakSections;
         private List<ImprovementSuggestion> suggestions;
+        private Map<String, Integer> sectionScores;
 
         public Builder resumeScore(int resumeScore) { this.resumeScore = resumeScore; return this; }
         public Builder missingKeywords(List<String> missingKeywords) { this.missingKeywords = missingKeywords; return this; }
         public Builder weakSections(List<String> weakSections) { this.weakSections = weakSections; return this; }
         public Builder suggestions(List<ImprovementSuggestion> suggestions) { this.suggestions = suggestions; return this; }
+        public Builder sectionScores(Map<String, Integer> sectionScores) { this.sectionScores = sectionScores; return this; }
 
         public ResumeCoachResult build() {
-            return new ResumeCoachResult(resumeScore, missingKeywords, weakSections, suggestions);
+            return new ResumeCoachResult(resumeScore, missingKeywords, weakSections, suggestions, sectionScores);
         }
     }
 
