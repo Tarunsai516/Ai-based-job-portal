@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
 import java.util.UUID;
@@ -246,6 +247,45 @@ public class ResumeService {
         }).toList();
     }
 
+    @Transactional
+    public void deleteResume(Long resumeId, Long userId) {
+        Resume resume = getResumeForUser(resumeId, userId);
+
+        // 1. Delete physical file from disk if it exists
+        if (resume.getStoredPath() != null) {
+            try {
+                Path filePath = Paths.get(resume.getStoredPath());
+                Files.deleteIfExists(filePath);
+                logger.info("Deleted physical resume file: {}", resume.getStoredPath());
+            } catch (IOException e) {
+                logger.warn("Could not delete physical resume file: {}", resume.getStoredPath(), e);
+            }
+        }
+
+        // 2. Handle candidate profile association
+        if (resume.getCandidateId() != null) {
+            candidateRepository.findById(resume.getCandidateId()).ifPresent(candidate -> {
+                if (resume.getOriginalFileName() != null && resume.getOriginalFileName().equals(candidate.getResumeUrl())) {
+                    List<Resume> remaining = resumeRepository.findByCandidateId(candidate.getId()).stream()
+                            .filter(r -> !r.getId().equals(resumeId))
+                            .sorted(java.util.Comparator.comparing(Resume::getCreatedAt).reversed())
+                            .toList();
+
+                    if (!remaining.isEmpty()) {
+                        candidate.setResumeUrl(remaining.get(0).getOriginalFileName());
+                    } else {
+                        candidate.setResumeUrl(null);
+                    }
+                    candidateRepository.save(candidate);
+                }
+            });
+        }
+
+        // 3. Delete resume record
+        resumeRepository.delete(resume);
+        logger.info("Deleted resume ID: {} for user ID: {}", resumeId, userId);
+    }
+
     @Transactional(readOnly = true)
     public com.jobportal.backend.service.ai.ResumeCoachResult reviewResumeForJob(Long resumeId, Long jobId,
             Long userId) {
@@ -320,6 +360,19 @@ public class ResumeService {
                 .map(Candidate::getSkills)
                 .orElse(Collections.emptyList());
         return aiProvider.coachResume(resume.getRawText(), "", skills, Collections.emptyList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> generateInterviewQuestions(Long resumeId, Long jobId, Long userId) {
+        Resume resume = getResumeForUser(resumeId, userId);
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
+        String resumeText = resume.getRawText() != null ? resume.getRawText() : "";
+        String jobText = (job.getTitle() != null ? job.getTitle() : "") + "\n" + (job.getDescription() != null ? job.getDescription() : "");
+        List<String> requiredSkills = job.getSkills() != null ? job.getSkills() : Collections.emptyList();
+
+        return aiProvider.generateInterviewQuestions(resumeText, jobText, requiredSkills);
     }
 
     /**
@@ -492,6 +545,116 @@ public class ResumeService {
         auditService.log(AuditAction.RESUME_UPLOADED, "Resume", String.valueOf(tailoredResume.getId()),
                 "Tailored DOCX from " + resumeId + " for Job " + jobId);
                 
+        return tailoredResume;
+    }
+
+    /**
+     * Preview AI tailoring recommendations and structured sections before saving.
+     */
+    public com.jobportal.backend.service.ai.TailoredResumeResult previewTailorResume(Long resumeId, Long jobId, Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate profile not found for user: " + userId));
+        Long candidateId = candidate.getId();
+
+        Resume original = resumeRepository.findById(resumeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resume not found: " + resumeId));
+
+        if (!original.getCandidateId().equals(candidateId)) {
+            throw new BadRequestException("Not authorized to access this resume");
+        }
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
+        String resumeText = original.getRawText();
+        if (resumeText == null || resumeText.isBlank()) {
+            resumeText = extractText(original.getStoredPath());
+            if (resumeText != null && !resumeText.isBlank()) {
+                original.setRawText(resumeText);
+                resumeRepository.save(original);
+            }
+        }
+
+        if (resumeText == null || resumeText.isBlank()) {
+            throw new BadRequestException("Could not extract text from this resume. Please re-upload.");
+        }
+
+        List<String> jobParts = new ArrayList<>();
+        jobParts.add("Job Title: " + job.getTitle());
+        if (job.getDescription() != null) jobParts.add("Description: " + job.getDescription());
+        if (job.getSkills() != null && !job.getSkills().isEmpty())
+            jobParts.add("Required Skills: " + String.join(", ", job.getSkills()));
+        if (job.getResponsibilities() != null && !job.getResponsibilities().isEmpty())
+            jobParts.add("Key Responsibilities:\n- " + String.join("\n- ", job.getResponsibilities()));
+        if (job.getQualifications() != null && !job.getQualifications().isEmpty())
+            jobParts.add("Requirements & Qualifications:\n- " + String.join("\n- ", job.getQualifications()));
+        String jobText = String.join("\n\n", jobParts);
+
+        return aiProvider.tailorResumeStructured(resumeText, jobText);
+    }
+
+    /**
+     * Generate and persist a tailored resume after user edits. Supports DOCX and PDF.
+     */
+    @Transactional
+    public Resume generateCustomTailoredResume(Long resumeId, Long jobId, com.jobportal.backend.service.ai.TailoredResumeResult customizedData, String format, Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate profile not found for user: " + userId));
+        Long candidateId = candidate.getId();
+
+        Resume original = resumeRepository.findById(resumeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resume not found: " + resumeId));
+
+        if (!original.getCandidateId().equals(candidateId)) {
+            throw new BadRequestException("Not authorized to tailor this resume");
+        }
+
+        boolean isPdf = "pdf".equalsIgnoreCase(format);
+        String ext = isPdf ? ".pdf" : ".docx";
+        String contentType = isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        String baseName = original.getOriginalFileName();
+        if (baseName != null) {
+            if (baseName.toLowerCase().endsWith(".pdf")) baseName = baseName.substring(0, baseName.length() - 4);
+            else if (baseName.toLowerCase().endsWith(".docx")) baseName = baseName.substring(0, baseName.length() - 5);
+        } else {
+            baseName = "Resume";
+        }
+
+        String newOriginalName = baseName + "-tailored-v" + (System.currentTimeMillis() % 1000) + ext;
+        String storedFilename = UUID.randomUUID() + ext;
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath();
+        Path filePath = uploadPath.resolve(storedFilename);
+
+        try {
+            if (isPdf) {
+                pdfGenerationService.generatePdf(customizedData, filePath);
+            } else {
+                docxGenerationService.generateDocx(customizedData, filePath);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate " + ext.toUpperCase() + " for tailored resume", e);
+        }
+
+        String tailoredText = buildTextFromStructured(customizedData);
+
+        Resume tailoredResume = Resume.builder()
+                .candidateId(candidateId)
+                .userId(userId)
+                .originalFileName(newOriginalName)
+                .storedFileName(storedFilename)
+                .storedPath(filePath.toString())
+                .contentType(contentType)
+                .fileSize(filePath.toFile().length())
+                .status(ResumeStatus.COMPLETED)
+                .rawText(tailoredText)
+                .build();
+
+        tailoredResume = resumeRepository.save(tailoredResume);
+
+        auditService.log(AuditAction.RESUME_UPLOADED, "Resume", String.valueOf(tailoredResume.getId()),
+                "Custom Tailored " + ext.toUpperCase() + " from " + resumeId + " for Job " + jobId);
+
         return tailoredResume;
     }
 

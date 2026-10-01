@@ -37,8 +37,21 @@ public class CandidateController {
         return ResponseEntity.ok(candidateService.updateProfile(candidateDto));
     }
 
+    @Autowired
+    private com.jobportal.backend.service.ResumeService resumeService;
+
     @PostMapping("/resume/upload")
     public ResponseEntity<Map<String, Object>> uploadResume(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(candidateService.uploadResume(file));
+    }
+
+    @DeleteMapping("/resume/{id}")
+    public ResponseEntity<Map<String, Object>> deleteResumeById(@PathVariable Long id) {
+        com.jobportal.backend.security.CustomUserDetails user = com.jobportal.backend.security.SecurityUtils.getCurrentUserDetails();
+        if (user == null) {
+            throw new com.jobportal.backend.common.exception.ForbiddenException("Authentication required");
+        }
+        resumeService.deleteResume(id, user.getId());
+        return ResponseEntity.ok(Map.of("message", "Resume deleted successfully", "resumeId", id));
     }
 }

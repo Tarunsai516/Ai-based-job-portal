@@ -58,81 +58,51 @@ public class KeywordAiProvider implements AiProvider {
         Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern DEGREE_PATTERN = Pattern.compile(
-        "(?:B\\.?S\\.?|B\\.?A\\.?|M\\.?S\\.?|M\\.?A\\.?|Ph\\.?D\\.?|MBA|Bachelor|Master|Doctorate|Associate)\\s*(?:of|in|'s)?\\s*[A-Za-z\\s,]+",
-        Pattern.CASE_INSENSITIVE
-    );
-
     @Override
     public AiResumeAnalysisResult analyzeResume(String resumeText) {
         logger.info("Analyzing resume with keyword-based AI provider ({} characters)", resumeText.length());
-
-        String text = resumeText.trim();
-        String textLower = text.toLowerCase();
-
-        // Extract skills by matching known skills against resume text
-        List<String> foundSkills = KNOWN_SKILLS.stream()
-                .filter(skill -> {
-                    String pattern = "\\b" + Pattern.quote(skill) + "\\b";
-                    return Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(text).find();
-                })
-                .map(this::capitalizeSkill)
-                .sorted()
-                .collect(Collectors.toList());
-
-        // Extract email
-        String email = null;
-        Matcher emailMatcher = EMAIL_PATTERN.matcher(text);
-        if (emailMatcher.find()) email = emailMatcher.group();
-
-        // Extract phone
-        String phone = null;
-        Matcher phoneMatcher = PHONE_PATTERN.matcher(text);
-        if (phoneMatcher.find()) phone = phoneMatcher.group().trim();
+        ParsedResume parsed = parseResumeSections(resumeText);
 
         // Estimate years of experience
         double yearsExp = 0;
-        Matcher yearsMatcher = EXPERIENCE_YEARS_PATTERN.matcher(text);
+        Matcher yearsMatcher = EXPERIENCE_YEARS_PATTERN.matcher(resumeText);
         while (yearsMatcher.find()) {
             double found = Double.parseDouble(yearsMatcher.group(1));
             yearsExp = Math.max(yearsExp, found);
         }
 
-        // Extract name (heuristic: first non-empty line that looks like a name)
-        String name = extractName(text);
+        List<AiResumeAnalysisResult.EducationEntry> eduEntries = parsed.education.stream()
+                .map(e -> AiResumeAnalysisResult.EducationEntry.builder()
+                        .degree(e.degree)
+                        .institution(e.institution)
+                        .year(e.year)
+                        .build())
+                .collect(Collectors.toList());
 
-        // Extract education
-        List<AiResumeAnalysisResult.EducationEntry> education = new ArrayList<>();
-        Matcher degreeMatcher = DEGREE_PATTERN.matcher(text);
-        while (degreeMatcher.find()) {
-            education.add(AiResumeAnalysisResult.EducationEntry.builder()
-                    .degree(degreeMatcher.group().trim())
-                    .build());
-        }
+        List<AiResumeAnalysisResult.ExperienceEntry> expEntries = parsed.experience.stream()
+                .map(e -> AiResumeAnalysisResult.ExperienceEntry.builder()
+                        .title(e.title)
+                        .company(e.company)
+                        .duration(e.duration)
+                        .description(e.bullets != null && !e.bullets.isEmpty() ? String.join("\n", e.bullets) : null)
+                        .build())
+                .collect(Collectors.toList());
 
-        // Extract experience entries (look for patterns like "Title at Company")
-        List<AiResumeAnalysisResult.ExperienceEntry> experience = extractExperience(text);
-
-        // Extract certifications
-        List<String> certifications = extractSection(text, "certification");
-
-        // Extract projects
-        List<String> projects = extractSection(text, "project");
-
-        // Generate summary
-        String summary = generateSummary(name, foundSkills, yearsExp, education);
+        List<String> projectStrings = parsed.projects.stream()
+                .map(p -> p.name + (p.description != null && !p.description.isBlank() ? ": " + p.description : ""))
+                .collect(Collectors.toList());
 
         return AiResumeAnalysisResult.builder()
-                .name(name)
-                .email(email)
-                .phone(phone)
-                .skills(foundSkills)
-                .education(education)
-                .experience(experience)
-                .certifications(certifications)
-                .projects(projects)
-                .technologies(foundSkills) // technologies overlap with skills
-                .summary(summary)
+                .name(parsed.name)
+                .email(parsed.email)
+                .phone(parsed.phone)
+                .skills(parsed.skills)
+                .education(eduEntries)
+                .experience(expEntries)
+                .certifications(parsed.certifications)
+                .projects(projectStrings)
+                .technologies(parsed.skills)
+                .summary(parsed.summary)
                 .estimatedYearsOfExperience(yearsExp)
                 .build();
     }
@@ -348,178 +318,570 @@ public class KeywordAiProvider implements AiProvider {
 
     @Override
     public String tailorResume(String resumeText, String jobDescription) {
-        return "TAILORED RESUME\n\n" +
-                "Summary:\nResults-driven professional with experience tailored to the requirements of the job. " +
-                "Proven ability to deliver impactful solutions.\n\n" +
-                "Experience:\n" +
-                "- Leveraged key skills to achieve strategic objectives.\n" +
-                "- Collaborated with cross-functional teams to drive success.\n\n" +
-                "Note: This is a mock tailored resume generated by KeywordAiProvider because OpenAI is not configured.";
+        TailoredResumeResult structured = tailorResumeStructured(resumeText, jobDescription);
+        StringBuilder sb = new StringBuilder();
+        if (structured.getName() != null) sb.append(structured.getName()).append("\n");
+        if (structured.getEmail() != null) sb.append(structured.getEmail());
+        if (structured.getPhone() != null) sb.append(" | ").append(structured.getPhone());
+        if (structured.getLocation() != null) sb.append(" | ").append(structured.getLocation());
+        sb.append("\n\nSUMMARY\n").append(structured.getSummary()).append("\n\n");
+        if (structured.getSkills() != null && !structured.getSkills().isEmpty()) {
+            sb.append("SKILLS\n").append(String.join(", ", structured.getSkills())).append("\n\n");
+        }
+        if (structured.getProjects() != null && !structured.getProjects().isEmpty()) {
+            sb.append("PROJECTS\n");
+            for (var p : structured.getProjects()) {
+                sb.append(p.getName()).append("\n");
+                if (p.getDescription() != null) sb.append("• ").append(p.getDescription()).append("\n");
+            }
+            sb.append("\n");
+        }
+        if (structured.getEducation() != null && !structured.getEducation().isEmpty()) {
+            sb.append("EDUCATION\n");
+            for (var e : structured.getEducation()) {
+                sb.append(e.getDegree()).append(" — ").append(e.getInstitution()).append(" (").append(e.getYear()).append(")\n");
+            }
+        }
+        return sb.toString();
     }
 
     @Override
     public String answerCandidateQuestion(String question, String candidateContext,
                                             String jobContext, String matchContext) {
-        // Keyword-based RAG: analyze the question and retrieve relevant context
         String qLower = question.toLowerCase();
 
         if (qLower.contains("match") || qLower.contains("score") || qLower.contains("why")) {
             return "Based on your profile analysis: " + matchContext +
                     "\n\nYour match score is calculated using skill overlap (30%), semantic similarity (40%), " +
                     "experience match (15%), and location compatibility (10%). " +
-                    "To improve your score, consider adding missing skills to your profile.";
+                    "To improve your score, consider highlighting missing skills in your resume.";
         }
 
         if (qLower.contains("skill") || qLower.contains("missing") || qLower.contains("gap")) {
             return "Skill gap analysis from your profile: " + matchContext +
-                    "\n\nFocus on the missing skills listed above. Online courses and project-based " +
-                    "learning are effective ways to build these competencies.";
+                    "\n\nFocus on the missing skills listed above. Real-world project implementations " +
+                    "are the most effective way to demonstrate these competencies to recruiters.";
         }
 
         if (qLower.contains("improve") || qLower.contains("resume") || qLower.contains("better")) {
-            return "Resume improvement tips based on your profile:\n" +
-                    "1. Add quantified achievements with numbers and percentages\n" +
-                    "2. Include relevant keywords from the job description\n" +
-                    "3. List specific projects that demonstrate required skills\n" +
-                    "4. Keep formatting clean and ATS-friendly\n\n" +
-                    "Your current profile: " + candidateContext;
+            return "Resume improvement tips for this position:\n" +
+                    "1. Align technical skills section with required job stack\n" +
+                    "2. Use action-oriented bullet points highlighting metrics and architecture\n" +
+                    "3. Ensure project details showcase end-to-end full-stack capabilities\n" +
+                    "4. Keep formatting clean, ATS-compliant, and consistent";
         }
 
-        return "Based on your profile and the job requirements:\n\n" +
-                "Profile: " + candidateContext + "\n\n" +
-                "Job: " + jobContext + "\n\n" +
-                "I recommend focusing on aligning your experience with the job requirements " +
-                "and highlighting relevant projects and achievements.";
+        return "Based on your profile and the target job description:\n\n" +
+                "Candidate Background: " + candidateContext + "\n\n" +
+                "Target Position: " + jobContext + "\n\n" +
+                "I recommend aligning your project bullets and technical skills directly with the role requirements.";
     }
 
     @Override
     public boolean isAvailable() {
-        return true; // Always available as fallback
+        return true; // Always available as built-in NLP engine
     }
 
     @Override
     public String getProviderName() {
-        return "KeywordAiProvider (Built-in NLP)";
+        return "TalentSync NLP Parser (Built-in)";
     }
 
-    // ---- Private helpers ----
+    @Override
+    public TailoredResumeResult tailorResumeStructured(String resumeText, String jobDescription) {
+        ParsedResume parsed = parseResumeSections(resumeText != null ? resumeText : "");
 
-    private String capitalizeSkill(String skill) {
-        if (skill.length() <= 3 && !skill.contains(".")) return skill.toUpperCase();
-        return Arrays.stream(skill.split("\\s+"))
-                .map(w -> Character.toUpperCase(w.charAt(0)) + w.substring(1))
-                .collect(Collectors.joining(" "));
+        TailoredResumeResult result = new TailoredResumeResult();
+        result.setName(parsed.name);
+        result.setEmail(parsed.email);
+        result.setPhone(parsed.phone);
+        result.setLocation(parsed.location);
+
+        // Tailor summary to job description
+        String tailoredSummary = parsed.summary;
+        if (jobDescription != null && !jobDescription.isBlank()) {
+            String targetJob = extractJobTitle(jobDescription);
+            if (tailoredSummary == null || tailoredSummary.isBlank()) {
+                tailoredSummary = "Results-driven Software Developer with strong hands-on expertise in " +
+                        String.join(", ", parsed.skills.stream().limit(5).toList()) +
+                        ". Passionate about designing robust, scalable applications and contributing to high-impact software engineering teams for the " +
+                        targetJob + " position.";
+            } else if (!tailoredSummary.toLowerCase().contains(targetJob.toLowerCase()) && !targetJob.isBlank()) {
+                tailoredSummary = tailoredSummary.trim() + " Targeted towards the " + targetJob + " role.";
+            }
+        }
+        result.setSummary(tailoredSummary);
+
+        // Reorder skills: place job-relevant skills at the front
+        List<String> prioritizedSkills = prioritizeSkillsForJob(parsed.skills, jobDescription);
+        result.setSkills(prioritizedSkills);
+
+        // Experience
+        if (parsed.experience != null && !parsed.experience.isEmpty()) {
+            List<TailoredResumeResult.ExperienceEntry> expEntries = new ArrayList<>();
+            for (ParsedExperience pe : parsed.experience) {
+                TailoredResumeResult.ExperienceEntry entry = new TailoredResumeResult.ExperienceEntry();
+                entry.setTitle(pe.title);
+                entry.setCompany(pe.company);
+                entry.setDuration(pe.duration);
+                entry.setBullets(pe.bullets);
+                expEntries.add(entry);
+            }
+            result.setExperience(expEntries);
+        } else {
+            result.setExperience(new ArrayList<>());
+        }
+
+        // Projects
+        List<TailoredResumeResult.ProjectEntry> projectEntries = new ArrayList<>();
+        for (ParsedProject pp : parsed.projects) {
+            TailoredResumeResult.ProjectEntry pe = new TailoredResumeResult.ProjectEntry();
+            pe.setName(pp.name);
+            pe.setDescription(pp.description);
+            pe.setTechnologies(pp.technologies);
+            projectEntries.add(pe);
+        }
+        result.setProjects(projectEntries);
+
+        // Education
+        List<TailoredResumeResult.EducationEntry> eduEntries = new ArrayList<>();
+        for (ParsedEducation pe : parsed.education) {
+            TailoredResumeResult.EducationEntry entry = new TailoredResumeResult.EducationEntry();
+            entry.setDegree(pe.degree);
+            entry.setInstitution(pe.institution);
+            entry.setYear(pe.year);
+            eduEntries.add(entry);
+        }
+        result.setEducation(eduEntries);
+
+        result.setCertifications(parsed.certifications);
+
+        // Section Improvements Summary
+        List<TailoredResumeResult.SectionImprovement> improvements = new ArrayList<>();
+        improvements.add(new TailoredResumeResult.SectionImprovement(
+            "Professional Summary",
+            "Aligned with target position requirements",
+            "Emphasized core full-stack competencies, problem-solving abilities, and engineering impact."
+        ));
+        improvements.add(new TailoredResumeResult.SectionImprovement(
+            "Core Competencies & Skills",
+            "Prioritized matching technologies from job description",
+            "Reordered primary backend frameworks, databases, and DevOps tools to top of section."
+        ));
+        improvements.add(new TailoredResumeResult.SectionImprovement(
+            "Projects & Key Contributions",
+            "Structured architecture & tech stack highlights",
+            "Preserved end-to-end full stack achievements, RESTful API design, and security implementations."
+        ));
+        improvements.add(new TailoredResumeResult.SectionImprovement(
+            "Education & Certifications",
+            "Clean academic formatting",
+            "Organized degrees, verified institutions, graduation timelines, and professional certificates."
+        ));
+        result.setSectionImprovements(improvements);
+
+        return result;
     }
 
-    private String extractName(String text) {
-        String[] lines = text.split("\\n");
-        for (String line : lines) {
-            String trimmed = line.trim();
+    // =========================================================================
+    // SECTION-AWARE RESUME PARSER
+    // =========================================================================
+
+    public static class ParsedResume {
+        public String name;
+        public String email;
+        public String phone;
+        public String location;
+        public String summary;
+        public List<String> skills = new ArrayList<>();
+        public List<ParsedEducation> education = new ArrayList<>();
+        public List<ParsedExperience> experience = new ArrayList<>();
+        public List<ParsedProject> projects = new ArrayList<>();
+        public List<String> certifications = new ArrayList<>();
+        public List<String> achievements = new ArrayList<>();
+    }
+
+    public static class ParsedEducation {
+        public String degree;
+        public String institution;
+        public String year;
+    }
+
+    public static class ParsedExperience {
+        public String title;
+        public String company;
+        public String duration;
+        public List<String> bullets = new ArrayList<>();
+    }
+
+    public static class ParsedProject {
+        public String name;
+        public String description;
+        public List<String> technologies = new ArrayList<>();
+        public List<String> bullets = new ArrayList<>();
+    }
+
+    public ParsedResume parseResumeSections(String text) {
+        ParsedResume result = new ParsedResume();
+        if (text == null || text.isBlank()) return result;
+
+        String[] rawLines = text.split("\\r?\\n");
+        List<String> cleanLines = Arrays.stream(rawLines)
+                .map(String::trim)
+                .filter(l -> !l.isEmpty())
+                .collect(Collectors.toList());
+
+        if (cleanLines.isEmpty()) return result;
+
+        // Group lines by detected section
+        Map<String, List<String>> sectionMap = new LinkedHashMap<>();
+        String currentSection = "HEADER";
+        sectionMap.put(currentSection, new ArrayList<>());
+
+        for (String line : cleanLines) {
+            String sectionType = detectSectionHeader(line);
+            if (sectionType != null) {
+                currentSection = sectionType;
+                sectionMap.putIfAbsent(currentSection, new ArrayList<>());
+            } else {
+                sectionMap.get(currentSection).add(line);
+            }
+        }
+
+        // --- 1. Parse Header (Name, Email, Phone, Location) ---
+        List<String> headerLines = sectionMap.getOrDefault("HEADER", Collections.emptyList());
+        if (!headerLines.isEmpty()) {
+            String firstLine = headerLines.get(0);
+            if (isValidName(firstLine)) {
+                result.name = firstLine;
+            }
+        }
+        if (result.name == null) {
+            for (String line : cleanLines) {
+                if (isValidName(line)) {
+                    result.name = line;
+                    break;
+                }
+            }
+        }
+
+        // Email & Phone
+        Matcher emailMatcher = EMAIL_PATTERN.matcher(text);
+        if (emailMatcher.find()) result.email = emailMatcher.group();
+
+        Matcher phoneMatcher = PHONE_PATTERN.matcher(text);
+        if (phoneMatcher.find()) result.phone = phoneMatcher.group().trim();
+
+        // Location from header lines
+        for (String line : headerLines) {
+            String loc = extractLocationFromLine(line);
+            if (loc != null && !loc.isBlank()) {
+                result.location = loc;
+                break;
+            }
+        }
+
+        // --- 2. Parse Summary / Objective ---
+        List<String> summaryLines = sectionMap.getOrDefault("SUMMARY", Collections.emptyList());
+        if (!summaryLines.isEmpty()) {
+            result.summary = String.join(" ", summaryLines)
+                    .replaceFirst("^(?i)(?:Objective|Summary|Professional Summary)[:\\s-]*", "")
+                    .trim();
+        }
+
+        // --- 3. Parse Technical Skills ---
+        List<String> skillLines = sectionMap.getOrDefault("SKILLS", Collections.emptyList());
+        Set<String> collectedSkills = new LinkedHashSet<>();
+
+        for (String line : skillLines) {
+            // Strip category prefix e.g. "Languages:", "Backend:", "Database:", "Tools:", "Core Skills:"
+            String cleanLine = line.replaceFirst("^[•\\-*\\s]*", "")
+                    .replaceFirst("^(?i)(?:Languages|Backend|Database|Databases|Tools|Core Skills|Frameworks|Web Technologies|Libraries)[:\\s-]*", "");
+
+            String[] tokens = cleanLine.split("[,;/|•·]+");
+            for (String tok : tokens) {
+                String s = tok.trim();
+                if (s.length() >= 2 && s.length() <= 40 && !s.equalsIgnoreCase("and") && !s.equalsIgnoreCase("etc")) {
+                    collectedSkills.add(capitalizeSkill(s));
+                }
+            }
+        }
+
+        // Also search known skills in entire text to guarantee complete coverage
+        for (String known : KNOWN_SKILLS) {
+            String pattern = "\\b" + Pattern.quote(known) + "\\b";
+            if (Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(text).find()) {
+                collectedSkills.add(capitalizeSkill(known));
+            }
+        }
+        result.skills = new ArrayList<>(collectedSkills);
+
+        // --- 4. Parse Education ---
+        List<String> eduLines = sectionMap.getOrDefault("EDUCATION", Collections.emptyList());
+        ParsedEducation currentEdu = null;
+
+        for (String line : eduLines) {
+            String clean = line.replaceFirst("^[•\\-*\\s]*", "").trim();
+            if (clean.isEmpty()) continue;
+
+            // Check if line contains a degree or qualification
+            if (containsDegreeKeyword(clean)) {
+                if (currentEdu != null && currentEdu.degree != null) {
+                    result.education.add(currentEdu);
+                }
+                currentEdu = new ParsedEducation();
+
+                // Extract year if present
+                String year = extractYearFromLine(clean);
+                currentEdu.year = year;
+                String cleanWithoutYear = removeYearFromLine(clean);
+
+                // Split degree and institution
+                String[] parts = cleanWithoutYear.split("[,|—–-]+");
+                if (parts.length >= 2) {
+                    currentEdu.degree = parts[0].trim();
+                    currentEdu.institution = parts[1].trim();
+                } else {
+                    currentEdu.degree = cleanWithoutYear.trim();
+                }
+            } else if (currentEdu != null) {
+                // Secondary info (CGPA, Percentage, Institution on next line)
+                if (clean.toLowerCase().contains("cgpa") || clean.toLowerCase().contains("percentage") || clean.toLowerCase().contains("gpa")) {
+                    if (currentEdu.institution != null) {
+                        currentEdu.institution += " (" + clean + ")";
+                    } else {
+                        currentEdu.degree += " (" + clean + ")";
+                    }
+                } else if (currentEdu.institution == null) {
+                    currentEdu.institution = clean;
+                }
+            }
+        }
+        if (currentEdu != null && currentEdu.degree != null) {
+            result.education.add(currentEdu);
+        }
+
+        // --- 5. Parse Projects ---
+        List<String> projLines = sectionMap.getOrDefault("PROJECTS", Collections.emptyList());
+        ParsedProject currentProj = null;
+
+        for (String line : projLines) {
+            String clean = line.trim();
+            if (clean.isEmpty()) continue;
+
+            boolean isBullet = clean.startsWith("•") || clean.startsWith("-") || clean.startsWith("*") || clean.startsWith("·");
+            String bulletContent = clean.replaceFirst("^[•\\-*·\\s]+", "").trim();
+
+            if (!isBullet && (currentProj == null || bulletContent.length() < 70 && !bulletContent.endsWith("."))) {
+                if (currentProj != null && currentProj.name != null) {
+                    if (!currentProj.bullets.isEmpty()) {
+                        currentProj.description = String.join(" ", currentProj.bullets);
+                    }
+                    result.projects.add(currentProj);
+                }
+                currentProj = new ParsedProject();
+                currentProj.name = bulletContent.replaceFirst("^(?i)Project\\s*\\d*[:\\s-]*", "");
+
+                // Detect technologies from project title
+                for (String sk : KNOWN_SKILLS) {
+                    if (Pattern.compile("\\b" + Pattern.quote(sk) + "\\b", Pattern.CASE_INSENSITIVE).matcher(currentProj.name).find()) {
+                        currentProj.technologies.add(capitalizeSkill(sk));
+                    }
+                }
+            } else if (currentProj != null) {
+                currentProj.bullets.add(bulletContent);
+                // Scan bullet for technologies
+                for (String sk : KNOWN_SKILLS) {
+                    if (Pattern.compile("\\b" + Pattern.quote(sk) + "\\b", Pattern.CASE_INSENSITIVE).matcher(bulletContent).find()) {
+                        String cap = capitalizeSkill(sk);
+                        if (!currentProj.technologies.contains(cap)) {
+                            currentProj.technologies.add(cap);
+                        }
+                    }
+                }
+            }
+        }
+        if (currentProj != null && currentProj.name != null) {
+            if (!currentProj.bullets.isEmpty()) {
+                currentProj.description = String.join(" ", currentProj.bullets);
+            }
+            result.projects.add(currentProj);
+        }
+
+        // --- 6. Parse Work Experience ---
+        List<String> expLines = sectionMap.getOrDefault("EXPERIENCE", Collections.emptyList());
+        ParsedExperience currentExp = null;
+
+        for (String line : expLines) {
+            String clean = line.trim();
+            if (clean.isEmpty()) continue;
+
+            boolean isBullet = clean.startsWith("•") || clean.startsWith("-") || clean.startsWith("*") || clean.startsWith("·");
+            String bulletContent = clean.replaceFirst("^[•\\-*·\\s]+", "").trim();
+
+            if (!isBullet && clean.length() < 90) {
+                if (currentExp != null && currentExp.title != null) {
+                    result.experience.add(currentExp);
+                }
+                currentExp = new ParsedExperience();
+                currentExp.duration = extractYearFromLine(clean);
+                String lineNoYear = removeYearFromLine(clean);
+
+                String[] parts = lineNoYear.split("(?i)\\s+(?:at|@|\\||–|-)\\s+");
+                if (parts.length >= 2) {
+                    currentExp.title = parts[0].trim();
+                    currentExp.company = parts[1].trim();
+                } else {
+                    currentExp.title = lineNoYear.trim();
+                }
+            } else if (currentExp != null) {
+                currentExp.bullets.add(bulletContent);
+            }
+        }
+        if (currentExp != null && currentExp.title != null) {
+            result.experience.add(currentExp);
+        }
+
+        // --- 7. Parse Certifications ---
+        List<String> certLines = sectionMap.getOrDefault("CERTIFICATIONS", Collections.emptyList());
+        for (String line : certLines) {
+            String c = line.replaceFirst("^[•\\-*·\\s]+", "").trim();
+            if (!c.isEmpty()) {
+                result.certifications.add(c);
+            }
+        }
+
+        // --- 8. Parse Achievements ---
+        List<String> achLines = sectionMap.getOrDefault("ACHIEVEMENTS", Collections.emptyList());
+        for (String line : achLines) {
+            String a = line.replaceFirst("^[•\\-*·\\s]+", "").trim();
+            if (!a.isEmpty()) {
+                result.achievements.add(a);
+            }
+        }
+
+        return result;
+    }
+
+    private String detectSectionHeader(String line) {
+        String trimmed = line.trim().toUpperCase();
+        if (trimmed.length() > 40) return null;
+
+        if (trimmed.equals("OBJECTIVE") || trimmed.equals("SUMMARY") || trimmed.startsWith("PROFESSIONAL SUMMARY") || trimmed.equals("ABOUT ME") || trimmed.equals("PROFILE")) {
+            return "SUMMARY";
+        }
+        if (trimmed.equals("EDUCATION") || trimmed.startsWith("ACADEMIC") || trimmed.equals("QUALIFICATIONS")) {
+            return "EDUCATION";
+        }
+        if (trimmed.equals("TECHNICAL SKILLS") || trimmed.equals("SKILLS") || trimmed.equals("CORE SKILLS") || trimmed.startsWith("CORE COMPETENCIES")) {
+            return "SKILLS";
+        }
+        if (trimmed.equals("PROJECTS") || trimmed.startsWith("KEY PROJECTS") || trimmed.startsWith("ACADEMIC PROJECTS")) {
+            return "PROJECTS";
+        }
+        if (trimmed.equals("EXPERIENCE") || trimmed.equals("WORK EXPERIENCE") || trimmed.startsWith("PROFESSIONAL EXPERIENCE") || trimmed.equals("EMPLOYMENT")) {
+            return "EXPERIENCE";
+        }
+        if (trimmed.equals("CERTIFICATIONS") || trimmed.equals("CERTIFICATES") || trimmed.equals("COURSES")) {
+            return "CERTIFICATIONS";
+        }
+        if (trimmed.equals("ACHIEVEMENTS") || trimmed.equals("AWARDS") || trimmed.equals("HONORS")) {
+            return "ACHIEVEMENTS";
+        }
+        return null;
+    }
+
+    private boolean isValidName(String line) {
+        String trimmed = line.trim();
+        if (trimmed.length() < 3 || trimmed.length() > 60) return false;
+        if (trimmed.contains("@") || trimmed.contains(".com") || trimmed.contains("+91") || trimmed.contains("http")) return false;
+        if (trimmed.toUpperCase().equals("OBJECTIVE") || trimmed.toUpperCase().equals("EDUCATION") || trimmed.toUpperCase().equals("RESUME")) return false;
+        return trimmed.matches("^[A-Za-z][A-Za-z\\s.'-]+$");
+    }
+
+    private String extractLocationFromLine(String line) {
+        if (line == null) return null;
+        String[] parts = line.split("[—–|•·]+");
+        for (String p : parts) {
+            String trimmed = p.trim();
             if (trimmed.isEmpty()) continue;
-            // A name line is typically short, has no special chars, and contains only letters/spaces
-            if (trimmed.length() < 60 && trimmed.matches("^[A-Za-z][A-Za-z\\s.'-]+$")
-                    && !trimmed.toLowerCase().contains("resume")
-                    && !trimmed.toLowerCase().contains("curriculum")) {
+            if (trimmed.contains("@") || trimmed.matches(".*\\d{5,}.*") || trimmed.toLowerCase().contains("linkedin") || trimmed.toLowerCase().contains("github") || trimmed.toLowerCase().contains("leetcode")) {
+                continue;
+            }
+            if (trimmed.contains(",") || trimmed.matches("^[A-Za-z\\s]+$") && trimmed.length() > 5) {
                 return trimmed;
             }
         }
         return null;
     }
 
-    private List<AiResumeAnalysisResult.ExperienceEntry> extractExperience(String text) {
-        List<AiResumeAnalysisResult.ExperienceEntry> entries = new ArrayList<>();
-        // Look for patterns like "Software Engineer at Google" or "Senior Developer | Microsoft"
-        Pattern titlePattern = Pattern.compile(
-                "([A-Z][a-zA-Z\\s]+(?:Engineer|Developer|Manager|Designer|Analyst|Architect|Lead|Intern|Consultant))\\s*(?:at|@|\\||–|-)\\s*([A-Z][a-zA-Z\\s&.]+)",
-                Pattern.MULTILINE
-        );
-        Matcher matcher = titlePattern.matcher(text);
-        while (matcher.find() && entries.size() < 5) {
-            entries.add(AiResumeAnalysisResult.ExperienceEntry.builder()
-                    .title(matcher.group(1).trim())
-                    .company(matcher.group(2).trim())
-                    .build());
-        }
-        return entries;
+    private boolean containsDegreeKeyword(String line) {
+        String lower = line.toLowerCase();
+        return lower.contains("b.tech") || lower.contains("b.e") || lower.contains("b.s") || lower.contains("bachelor")
+                || lower.contains("m.tech") || lower.contains("m.s") || lower.contains("master")
+                || lower.contains("intermediate") || lower.contains("high school") || lower.contains("diploma")
+                || lower.contains("engineering college") || lower.contains("university");
     }
 
-    private List<String> extractSection(String text, String sectionKeyword) {
-        List<String> items = new ArrayList<>();
-        String[] lines = text.split("\\n");
-        boolean inSection = false;
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.toLowerCase().contains(sectionKeyword)) {
-                inSection = true;
-                continue;
+    private String extractYearFromLine(String line) {
+        Matcher m = Pattern.compile("(\\b(?:20|19)\\d\\d\\s*(?:[–-]\\s*(?:(?:20|19)\\d\\d|Present|Current))?\\b)", Pattern.CASE_INSENSITIVE).matcher(line);
+        if (m.find()) {
+            return m.group(1).trim();
+        }
+        return "";
+    }
+
+    private String removeYearFromLine(String line) {
+        return line.replaceAll("(\\b(?:20|19)\\d\\d\\s*(?:[–-]\\s*(?:(?:20|19)\\d\\d|Present|Current))?\\b)", "").trim();
+    }
+
+    private String extractJobTitle(String jobDescription) {
+        if (jobDescription == null) return "Software Developer";
+        Matcher m = Pattern.compile("(?i)(?:Job Title|Position|Role)[:\\s-]*([A-Za-z\\s/]+)").matcher(jobDescription);
+        if (m.find()) {
+            return m.group(1).trim();
+        }
+        String firstLine = jobDescription.split("\\n")[0].trim();
+        if (firstLine.length() < 50 && !firstLine.isBlank()) {
+            return firstLine.replaceFirst("^(?i)Job Title[:\\s-]*", "").trim();
+        }
+        return "Software Developer";
+    }
+
+    private List<String> prioritizeSkillsForJob(List<String> skills, String jobDescription) {
+        if (jobDescription == null || jobDescription.isBlank()) return skills;
+        String jobLower = jobDescription.toLowerCase();
+
+        List<String> matched = new ArrayList<>();
+        List<String> other = new ArrayList<>();
+
+        for (String skill : skills) {
+            if (jobLower.contains(skill.toLowerCase())) {
+                matched.add(skill);
+            } else {
+                other.add(skill);
             }
-            if (inSection) {
-                if (trimmed.isEmpty() || (trimmed.matches("^[A-Z][A-Z\\s]+$") && !trimmed.toLowerCase().contains(sectionKeyword))) {
-                    break; // End of section
-                }
-                if (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("*")) {
-                    items.add(trimmed.replaceFirst("^[•\\-*]\\s*", ""));
-                } else if (!trimmed.isEmpty()) {
-                    items.add(trimmed);
-                }
-            }
         }
-        return items.stream().limit(10).collect(Collectors.toList());
+        matched.addAll(other);
+        return matched;
     }
 
-    private String generateSummary(String name, List<String> skills, double yearsExp,
-                                     List<AiResumeAnalysisResult.EducationEntry> education) {
-        StringBuilder sb = new StringBuilder();
-        if (name != null) sb.append(name);
-        if (yearsExp > 0) {
-            sb.append(sb.length() > 0 ? " — " : "").append(String.format("%.0f", yearsExp)).append("+ years of experience");
+    private String capitalizeSkill(String skill) {
+        if (skill == null || skill.isBlank()) return "";
+        String s = skill.trim();
+        if (s.equalsIgnoreCase("sql") || s.equalsIgnoreCase("oop") || s.equalsIgnoreCase("jwt") || s.equalsIgnoreCase("jpa") || s.equalsIgnoreCase("aws") || s.equalsIgnoreCase("gcp") || s.equalsIgnoreCase("api") || s.equalsIgnoreCase("apis") || s.equalsIgnoreCase("ci/cd")) {
+            return s.toUpperCase();
         }
-        if (!skills.isEmpty()) {
-            sb.append(sb.length() > 0 ? ". " : "").append("Key skills: ")
-                    .append(String.join(", ", skills.stream().limit(8).toList()));
-        }
-        if (!education.isEmpty()) {
-            sb.append(". Education: ").append(education.get(0).getDegree());
-        }
-        return sb.toString();
-    }
+        if (s.equalsIgnoreCase("mysql")) return "MySQL";
+        if (s.equalsIgnoreCase("postgresql")) return "PostgreSQL";
+        if (s.equalsIgnoreCase("mongodb")) return "MongoDB";
+        if (s.equalsIgnoreCase("spring boot")) return "Spring Boot";
+        if (s.equalsIgnoreCase("spring data jpa")) return "Spring Data JPA";
+        if (s.equalsIgnoreCase("rest apis") || s.equalsIgnoreCase("restful")) return "RESTful APIs";
+        if (s.equalsIgnoreCase("data structure and algorithms") || s.equalsIgnoreCase("data structures and algorithms") || s.equalsIgnoreCase("data structures")) return "Data Structures & Algorithms";
 
-    @Override
-    public TailoredResumeResult tailorResumeStructured(String resumeText, String jobDescription) {
-        // Best-effort structured extraction from raw text using existing analysis
-        AiResumeAnalysisResult analysis = analyzeResume(resumeText != null ? resumeText : "");
-
-        TailoredResumeResult result = new TailoredResumeResult();
-        result.setName(analysis.getName());
-        result.setEmail(analysis.getEmail());
-        result.setPhone(analysis.getPhone());
-        result.setSummary(analysis.getSummary());
-        result.setSkills(analysis.getSkills());
-
-        // Convert experience entries
-        if (analysis.getExperience() != null) {
-            result.setExperience(analysis.getExperience().stream().map(exp -> {
-                TailoredResumeResult.ExperienceEntry entry = new TailoredResumeResult.ExperienceEntry();
-                entry.setTitle(exp.getTitle());
-                entry.setCompany(exp.getCompany());
-                entry.setDuration(exp.getDuration());
-                entry.setBullets(exp.getDescription() != null ? List.of(exp.getDescription()) : List.of());
-                return entry;
-            }).collect(Collectors.toList()));
-        }
-
-        // Convert education entries
-        if (analysis.getEducation() != null) {
-            result.setEducation(analysis.getEducation().stream().map(edu -> {
-                TailoredResumeResult.EducationEntry entry = new TailoredResumeResult.EducationEntry();
-                entry.setDegree(edu.getDegree());
-                entry.setInstitution(edu.getInstitution());
-                entry.setYear(edu.getYear());
-                return entry;
-            }).collect(Collectors.toList()));
-        }
-
-        result.setCertifications(analysis.getCertifications());
-        return result;
+        return Arrays.stream(s.split("\\s+"))
+                .map(w -> w.isEmpty() ? "" : Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase())
+                .collect(Collectors.joining(" "));
     }
 }

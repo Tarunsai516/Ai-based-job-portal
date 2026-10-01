@@ -19,7 +19,12 @@ public class TailoredResumeResult {
     private List<String> certifications;
     private List<ProjectEntry> projects;
 
+    private List<SectionImprovement> sectionImprovements;
+
     public TailoredResumeResult() {}
+
+    public List<SectionImprovement> getSectionImprovements() { return sectionImprovements; }
+    public void setSectionImprovements(List<SectionImprovement> sectionImprovements) { this.sectionImprovements = sectionImprovements; }
 
     // --- Getters & Setters ---
 
@@ -108,5 +113,28 @@ public class TailoredResumeResult {
 
         public List<String> getTechnologies() { return technologies; }
         public void setTechnologies(List<String> technologies) { this.technologies = technologies; }
+    }
+
+    public static class SectionImprovement {
+        private String section;
+        private String whyImproved;
+        private String keyChanges;
+
+        public SectionImprovement() {}
+
+        public SectionImprovement(String section, String whyImproved, String keyChanges) {
+            this.section = section;
+            this.whyImproved = whyImproved;
+            this.keyChanges = keyChanges;
+        }
+
+        public String getSection() { return section; }
+        public void setSection(String section) { this.section = section; }
+
+        public String getWhyImproved() { return whyImproved; }
+        public void setWhyImproved(String whyImproved) { this.whyImproved = whyImproved; }
+
+        public String getKeyChanges() { return keyChanges; }
+        public void setKeyChanges(String keyChanges) { this.keyChanges = keyChanges; }
     }
 }

@@ -63,4 +63,10 @@ public class InterviewController {
     public ResponseEntity<List<Interview>> getByRecruiter(@PathVariable Long recruiterId) {
         return ResponseEntity.ok(interviewService.getInterviewsByRecruiter(recruiterId));
     }
+
+    @GetMapping("/generate-questions/candidate/{candidateId}/job/{jobId}")
+    public ResponseEntity<List<String>> generateQuestionsForCandidate(
+            @PathVariable Long candidateId, @PathVariable Long jobId) {
+        return ResponseEntity.ok(interviewService.generateQuestionsForCandidate(candidateId, jobId));
+    }
 }

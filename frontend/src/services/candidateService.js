@@ -39,8 +39,23 @@ export const candidateService = {
     return response.data;
   },
 
+  getInterviewQuestions: async (resumeId, jobId) => {
+    const response = await api.get(`/resumes/${resumeId}/interview-questions/job/${jobId}`);
+    return response.data;
+  },
+
   tailorResume: async (resumeId, jobId) => {
     const response = await api.post(`/resumes/${resumeId}/tailor/${jobId}`);
+    return response.data;
+  },
+
+  previewTailorResume: async (resumeId, jobId) => {
+    const response = await api.get(`/resumes/${resumeId}/tailor-preview/job/${jobId}`);
+    return response.data;
+  },
+
+  generateCustomTailoredResume: async (resumeId, jobId, customizedData, format = 'docx') => {
+    const response = await api.post(`/resumes/${resumeId}/tailor-custom/job/${jobId}?format=${format}`, customizedData);
     return response.data;
   },
 
@@ -56,6 +71,11 @@ export const candidateService = {
 
   downloadResume: async (resumeId) => {
     const response = await api.get(`/resumes/${resumeId}/file`, { responseType: 'blob' });
+    return response.data;
+  },
+
+  deleteResume: async (resumeId) => {
+    const response = await api.delete(`/resumes/${resumeId}`);
     return response.data;
   },
 

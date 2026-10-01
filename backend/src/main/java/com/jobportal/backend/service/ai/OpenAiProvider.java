@@ -186,9 +186,10 @@ public class OpenAiProvider implements AiProvider {
             String schema = "{ \"name\": \"\", \"email\": \"\", \"phone\": \"\", \"location\": \"\", \"summary\": \"\", " +
                     "\"skills\": [], \"experience\": [{ \"title\": \"\", \"company\": \"\", \"duration\": \"\", \"bullets\": [] }], " +
                     "\"education\": [{ \"degree\": \"\", \"institution\": \"\", \"year\": \"\" }], " +
-                    "\"certifications\": [], \"projects\": [{ \"name\": \"\", \"description\": \"\", \"technologies\": [] }] }";
+                    "\"certifications\": [], \"projects\": [{ \"name\": \"\", \"description\": \"\", \"technologies\": [] }], " +
+                    "\"sectionImprovements\": [{ \"section\": \"\", \"whyImproved\": \"\", \"keyChanges\": \"\" }] }";
             String json = requestJson(
-                    "Tailor this resume for the job description. Rewrite summary and bullets to align with the job. Do NOT fabricate experience.",
+                    "You are an executive resume writer. Tailor this resume for the job description. Rewrite summary and achievement bullets using active verbs and metrics to align with the job. Do NOT fabricate experience.",
                     "Return ONLY a JSON object matching: " + schema,
                     "Original Resume:\n" + safeText(resumeText) + "\n\nJob Description:\n" + safeText(jobDescription));
             return objectMapper.readValue(json, TailoredResumeResult.class);

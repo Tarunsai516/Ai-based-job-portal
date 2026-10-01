@@ -8,7 +8,8 @@ import {
   HiOutlineLocationMarker, HiPencil, HiOutlineDocumentText,
   HiOutlineAcademicCap, HiOutlineBriefcase, HiOutlineSparkles,
   HiOutlineCheckCircle, HiOutlineClock, HiOutlineExclamationCircle,
-  HiOutlineChip, HiOutlineArrowRight, HiOutlineUpload
+  HiOutlineChip, HiOutlineArrowRight, HiOutlineUpload,
+  HiOutlineTrash, HiOutlineDownload
 } from 'react-icons/hi';
 
 // ── Strength meter helpers ────────────────────────────────────────────────────
@@ -97,6 +98,29 @@ export default function Profile() {
       setLoading(false);
     });
   }, [user]);
+
+  const handleDownloadResume = async (resumeId) => {
+    try {
+      const blob = await candidateService.downloadResume(resumeId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDeleteResume = async (resumeId) => {
+    if (!window.confirm('Are you sure you want to delete this resume?')) return;
+    try {
+      await candidateService.deleteResume(resumeId);
+      setResumes(prev => prev.filter(r => r.resumeId !== resumeId));
+      const updatedProfile = await candidateService.getMyProfile().catch(() => null);
+      if (updatedProfile) setProfile(updatedProfile);
+    } catch {
+      // ignore
+    }
+  };
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (loading) {
@@ -310,6 +334,26 @@ export default function Profile() {
                           </span>
                         )}
                         <ResumePill status={resume.status} />
+                        {resume.resumeId && (
+                          <div className="flex items-center gap-1 ml-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadResume(resume.resumeId)}
+                              className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                              title="Download resume"
+                            >
+                              <HiOutlineDownload className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteResume(resume.resumeId)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                              title="Delete resume"
+                            >
+                              <HiOutlineTrash className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

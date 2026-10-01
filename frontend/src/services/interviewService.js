@@ -15,4 +15,9 @@ export const interviewService = {
     const response = await api.get(`/interviews/candidate/${candidateId}`);
     return response.data;
   },
+
+  generateQuestions: async (candidateId, jobId) => {
+    const response = await api.get(`/interviews/generate-questions/candidate/${candidateId}/job/${jobId}`);
+    return response.data;
+  },
 };

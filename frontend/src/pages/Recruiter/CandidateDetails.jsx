@@ -22,6 +22,8 @@ export default function CandidateDetails() {
   const [candidate, setCandidate] = useState(null);
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [interviewQuestions, setInterviewQuestions] = useState(null);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -116,6 +118,23 @@ export default function CandidateDetails() {
     }
   };
 
+  const handleGenerateQuestions = async () => {
+    if (!candidate?.id || !application?.jobId) {
+      setToast({ message: 'Need an associated job to generate interview questions.', type: 'error' });
+      return;
+    }
+    setQuestionsLoading(true);
+    try {
+      const qList = await interviewService.generateQuestions(candidate.id, application.jobId);
+      setInterviewQuestions(qList);
+      setToast({ message: 'Tailored interview questions generated!', type: 'success' });
+    } catch (error) {
+      setToast({ message: error.response?.data?.message || 'Could not generate interview questions.', type: 'error' });
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       {toast && (
@@ -183,7 +202,26 @@ export default function CandidateDetails() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
-          <h3 className="text-sm font-bold text-gray-900">Interview Details</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-gray-900">Interview & Screening</h3>
+            <button
+              onClick={handleGenerateQuestions}
+              disabled={questionsLoading || !application?.jobId}
+              className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5 disabled:opacity-40"
+            >
+              {questionsLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-indigo-700 border-t-transparent" />
+                  Generating Questions...
+                </>
+              ) : (
+                <>
+                  <span>✨</span> Generate AI Interview Questions
+                </>
+              )}
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="text-xs font-semibold text-gray-700">
               Date and time
@@ -197,6 +235,34 @@ export default function CandidateDetails() {
             </label>
           </div>
           {!application && <p className="text-xs text-amber-600">No application was found for this candidate.</p>}
+
+          {/* Generated AI Interview Questions List */}
+          {interviewQuestions && interviewQuestions.length > 0 && (
+            <div className="mt-4 bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                  Suggested Screening Questions ({interviewQuestions.length})
+                </span>
+                <button
+                  onClick={handleGenerateQuestions}
+                  disabled={questionsLoading}
+                  className="text-xs text-indigo-600 hover:underline font-semibold"
+                >
+                  Regenerate
+                </button>
+              </div>
+              <div className="space-y-2">
+                {interviewQuestions.map((q, idx) => (
+                  <div key={idx} className="bg-white border border-indigo-150/70 rounded-lg p-3 text-xs text-gray-800 flex items-start gap-2.5 shadow-xs">
+                    <span className="h-5 w-5 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <span className="leading-relaxed font-medium">{q}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Evaluation and Match details */}

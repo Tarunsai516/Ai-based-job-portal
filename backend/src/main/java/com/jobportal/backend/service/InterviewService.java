@@ -42,6 +42,15 @@ public class InterviewService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private com.jobportal.backend.repository.JobRepository jobRepository;
+
+    @Autowired
+    private com.jobportal.backend.repository.ResumeRepository resumeRepository;
+
+    @Autowired
+    private com.jobportal.backend.service.ai.AiProvider aiProvider;
+
     /**
      * Schedule an interview for an application.
      */
@@ -180,5 +189,20 @@ public class InterviewService {
     @Transactional(readOnly = true)
     public List<Interview> getInterviewsByRecruiter(Long recruiterId) {
         return interviewRepository.findByRecruiterId(recruiterId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> generateQuestionsForCandidate(Long candidateId, Long jobId) {
+        com.jobportal.backend.model.Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
+
+        String resumeText = resumeRepository.findTopByCandidateIdOrderByCreatedAtDesc(candidateId)
+                .map(com.jobportal.backend.model.Resume::getRawText)
+                .orElse("");
+
+        String jobText = (job.getTitle() != null ? job.getTitle() : "") + "\n" + (job.getDescription() != null ? job.getDescription() : "");
+        List<String> requiredSkills = job.getSkills() != null ? job.getSkills() : java.util.Collections.emptyList();
+
+        return aiProvider.generateInterviewQuestions(resumeText, jobText, requiredSkills);
     }
 }

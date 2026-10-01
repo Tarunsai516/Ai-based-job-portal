@@ -179,33 +179,56 @@ public class GeminiAiProvider implements AiProvider {
         if (!isAvailable()) return fallback.tailorResumeStructured(resumeText, jobDescription);
         try {
             String json = requestText(
-                "Tailor this resume for the given job description. Rewrite the summary and experience bullets " +
-                "to strongly align with the job. Do NOT fabricate experience or skills the candidate does not have. " +
-                "Return ONLY a valid JSON object (no markdown code blocks) matching this exact schema:\n" +
+                "You are an elite executive resume writer and ATS optimization specialist. " +
+                "Carefully analyze the candidate's original resume against the target job description. " +
+                "Tailor the resume to showcase maximum relevance for the job while preserving factual accuracy (never invent employers or degrees). " +
+                "Key tailoring rules:\n" +
+                "1. Summary: Craft a compelling 3-4 sentence professional summary emphasizing relevant years of experience, core technical specialties, and alignment with the job goals.\n" +
+                "2. Skills: Reorder and group relevant technical and professional skills matching the job keywords.\n" +
+                "3. Experience: Rewrite bullet points using Google/XYZ format (Accomplished [X] as measured by [Y], by doing [Z]). Start with strong active verbs, highlight technical stack, and emphasize quantifiable impact.\n" +
+                "4. Section Improvements: Provide a clear breakdown explaining why each section was improved and the key optimizations made.\n\n" +
+                "Return ONLY a valid JSON object matching this exact schema:\n" +
                 "{\n" +
                 "  \"name\": \"Candidate Full Name\",\n" +
                 "  \"email\": \"email@example.com\",\n" +
                 "  \"phone\": \"+1234567890\",\n" +
                 "  \"location\": \"City, State\",\n" +
-                "  \"summary\": \"A concise 2-3 sentence professional summary tailored to the job\",\n" +
-                "  \"skills\": [\"Skill1\", \"Skill2\"],\n" +
+                "  \"summary\": \"Compelling professional summary tailored to target role...\",\n" +
+                "  \"skills\": [\"Skill1\", \"Skill2\", \"Skill3\"],\n" +
                 "  \"experience\": [\n" +
                 "    {\n" +
                 "      \"title\": \"Job Title\",\n" +
                 "      \"company\": \"Company Name\",\n" +
-                "      \"duration\": \"Jan 2020 - Present\",\n" +
-                "      \"bullets\": [\"Achievement-focused bullet point tailored to the job\", \"Another bullet\"]\n" +
+                "      \"duration\": \"Month Year - Present\",\n" +
+                "      \"bullets\": [\"Action verb + impact-focused achievement...\", \"Another bullet...\"]\n" +
                 "    }\n" +
                 "  ],\n" +
                 "  \"education\": [\n" +
-                "    { \"degree\": \"B.S. Computer Science\", \"institution\": \"University\", \"year\": \"2020\" }\n" +
+                "    { \"degree\": \"Degree Name\", \"institution\": \"University Name\", \"year\": \"Graduation Year\" }\n" +
                 "  ],\n" +
-                "  \"certifications\": [\"Cert Name\"],\n" +
+                "  \"certifications\": [\"Certification Name\"],\n" +
                 "  \"projects\": [\n" +
-                "    { \"name\": \"Project\", \"description\": \"What it does\", \"technologies\": [\"Tech1\"] }\n" +
+                "    { \"name\": \"Project Title\", \"description\": \"Impact & architecture description\", \"technologies\": [\"Tech1\", \"Tech2\"] }\n" +
+                "  ],\n" +
+                "  \"sectionImprovements\": [\n" +
+                "    {\n" +
+                "      \"section\": \"Professional Summary\",\n" +
+                "      \"whyImproved\": \"Why this section needed changes for the target role\",\n" +
+                "      \"keyChanges\": \"Key keywords and strengths added\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"section\": \"Work Experience\",\n" +
+                "      \"whyImproved\": \"Aligned bullet points with job responsibilities\",\n" +
+                "      \"keyChanges\": \"Enhanced metrics, active verbs, and relevant technologies\"\n" +
+                "    },\n" +
+                "    {\n" +
+                "      \"section\": \"Key Skills\",\n" +
+                "      \"whyImproved\": \"Prioritized high-match keywords from job description\",\n" +
+                "      \"keyChanges\": \"Grouped and emphasized required core proficiencies\"\n" +
+                "    }\n" +
                 "  ]\n" +
                 "}",
-                "Original Resume:\n" + safeText(resumeText) + "\n\nJob Description:\n" + safeText(jobDescription));
+                "Original Resume:\n" + safeText(resumeText) + "\n\nTarget Job Description:\n" + safeText(jobDescription));
 
             json = extractJson(json);
             return objectMapper.readValue(json, TailoredResumeResult.class);
@@ -243,7 +266,10 @@ public class GeminiAiProvider implements AiProvider {
 
     @Override
     public boolean isAvailable() {
-        return apiKey != null && !apiKey.isBlank() && !apiKey.equalsIgnoreCase("mock_key");
+        return apiKey != null && !apiKey.isBlank()
+                && !apiKey.equalsIgnoreCase("mock_key")
+                && !apiKey.contains("YOUR_GEMINI_API_KEY_HERE")
+                && !apiKey.contains("YOUR_");
     }
 
     @Override
