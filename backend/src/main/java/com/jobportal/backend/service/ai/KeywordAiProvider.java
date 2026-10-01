@@ -455,4 +455,43 @@ public class KeywordAiProvider implements AiProvider {
         }
         return sb.toString();
     }
+
+    @Override
+    public TailoredResumeResult tailorResumeStructured(String resumeText, String jobDescription) {
+        // Best-effort structured extraction from raw text using existing analysis
+        AiResumeAnalysisResult analysis = analyzeResume(resumeText != null ? resumeText : "");
+
+        TailoredResumeResult result = new TailoredResumeResult();
+        result.setName(analysis.getName());
+        result.setEmail(analysis.getEmail());
+        result.setPhone(analysis.getPhone());
+        result.setSummary(analysis.getSummary());
+        result.setSkills(analysis.getSkills());
+
+        // Convert experience entries
+        if (analysis.getExperience() != null) {
+            result.setExperience(analysis.getExperience().stream().map(exp -> {
+                TailoredResumeResult.ExperienceEntry entry = new TailoredResumeResult.ExperienceEntry();
+                entry.setTitle(exp.getTitle());
+                entry.setCompany(exp.getCompany());
+                entry.setDuration(exp.getDuration());
+                entry.setBullets(exp.getDescription() != null ? List.of(exp.getDescription()) : List.of());
+                return entry;
+            }).collect(Collectors.toList()));
+        }
+
+        // Convert education entries
+        if (analysis.getEducation() != null) {
+            result.setEducation(analysis.getEducation().stream().map(edu -> {
+                TailoredResumeResult.EducationEntry entry = new TailoredResumeResult.EducationEntry();
+                entry.setDegree(edu.getDegree());
+                entry.setInstitution(edu.getInstitution());
+                entry.setYear(edu.getYear());
+                return entry;
+            }).collect(Collectors.toList()));
+        }
+
+        result.setCertifications(analysis.getCertifications());
+        return result;
+    }
 }

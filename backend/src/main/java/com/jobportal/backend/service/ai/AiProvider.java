@@ -29,6 +29,13 @@ public interface AiProvider {
     String tailorResume(String resumeText, String jobDescription);
 
     /**
+     * Tailor a resume and return structured data suitable for DOCX generation.
+     * Returns sections (summary, skills, experience with bullets, education, etc.)
+     * as a {@link TailoredResumeResult}.
+     */
+    TailoredResumeResult tailorResumeStructured(String resumeText, String jobDescription);
+
+    /**
      * Answer a candidate's question using their profile, resume, and job context (Job Copilot / RAG).
      */
     String answerCandidateQuestion(String question, String candidateContext, String jobContext, String matchContext);

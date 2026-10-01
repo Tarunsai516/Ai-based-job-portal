@@ -80,6 +80,9 @@ public class ResumeService {
     @Autowired
     private PdfGenerationService pdfGenerationService;
 
+    @Autowired
+    private DocxGenerationService docxGenerationService;
+
     private final Tika tika = new Tika();
 
     /**
@@ -369,7 +372,7 @@ public class ResumeService {
     }
 
     /**
-     * Tailor a resume to a specific job and save it as a new PDF.
+     * Tailor a resume to a specific job and save it as a new DOCX.
      */
     @Transactional
     public Resume tailorResume(Long resumeId, Long jobId, Long userId) {
@@ -387,10 +390,40 @@ public class ResumeService {
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
-        // 1. Get AI tailored text
-        String tailoredText = aiProvider.tailorResume(original.getRawText(), job.getDescription());
+        // 1. Get resume text — re-extract from file if rawText is missing
+        String resumeText = original.getRawText();
+        if (resumeText == null || resumeText.isBlank()) {
+            logger.info("rawText is empty for resume {}; re-extracting from file", resumeId);
+            resumeText = extractText(original.getStoredPath());
+            if (resumeText != null && !resumeText.isBlank()) {
+                original.setRawText(resumeText);
+                resumeRepository.save(original);
+            }
+        }
         
-        // 2. Generate PDF
+        if (resumeText == null || resumeText.isBlank()) {
+            throw new BadRequestException("Could not extract text from this resume. Please re-upload.");
+        }
+        
+        // Build rich job context for better AI tailoring
+        java.util.List<String> jobParts = new java.util.ArrayList<>();
+        jobParts.add("Job Title: " + job.getTitle());
+        if (job.getDescription() != null)    jobParts.add("Description: " + job.getDescription());
+        if (job.getSkills() != null && !job.getSkills().isEmpty())
+            jobParts.add("Required Skills: " + String.join(", ", job.getSkills()));
+        if (job.getResponsibilities() != null && !job.getResponsibilities().isEmpty())
+            jobParts.add("Key Responsibilities:\n- " + String.join("\n- ", job.getResponsibilities()));
+        if (job.getQualifications() != null && !job.getQualifications().isEmpty())
+            jobParts.add("Requirements & Qualifications:\n- " + String.join("\n- ", job.getQualifications()));
+        String jobText = String.join("\n\n", jobParts);
+        
+        logger.info("Tailoring resume {} ({} chars) for job {}", resumeId, resumeText.length(), jobId);
+        
+        // 2. Get AI-tailored structured data
+        com.jobportal.backend.service.ai.TailoredResumeResult tailoredData = 
+                aiProvider.tailorResumeStructured(resumeText, jobText);
+        
+        // 3. Generate DOCX from structured data
         String baseName = original.getOriginalFileName();
         if (baseName != null && baseName.toLowerCase().endsWith(".pdf")) {
             baseName = baseName.substring(0, baseName.length() - 4);
@@ -400,25 +433,28 @@ public class ResumeService {
             baseName = "Resume";
         }
         
-        String newOriginalName = baseName + "-v" + (System.currentTimeMillis() % 1000) + ".pdf";
-        String storedFilename = UUID.randomUUID() + ".pdf";
+        String newOriginalName = baseName + "-tailored-v" + (System.currentTimeMillis() % 1000) + ".docx";
+        String storedFilename = UUID.randomUUID() + ".docx";
         Path uploadPath = Paths.get(uploadDir).toAbsolutePath();
         Path filePath = uploadPath.resolve(storedFilename);
         
         try {
-            pdfGenerationService.generatePdfFromText(tailoredText, filePath);
+            docxGenerationService.generateDocx(tailoredData, filePath);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to generate PDF for tailored resume", e);
+            throw new RuntimeException("Failed to generate DOCX for tailored resume", e);
         }
         
-        // 3. Save new Resume entity
+        // Build a text summary from the structured data for rawText storage
+        String tailoredText = buildTextFromStructured(tailoredData);
+        
+        // 4. Save new Resume entity
         Resume tailoredResume = Resume.builder()
                 .candidateId(candidateId)
                 .userId(userId)
                 .originalFileName(newOriginalName)
                 .storedFileName(storedFilename)
                 .storedPath(filePath.toString())
-                .contentType("application/pdf")
+                .contentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                 .fileSize(filePath.toFile().length())
                 .status(ResumeStatus.COMPLETED)
                 .rawText(tailoredText)
@@ -427,9 +463,49 @@ public class ResumeService {
         tailoredResume = resumeRepository.save(tailoredResume);
         
         auditService.log(AuditAction.RESUME_UPLOADED, "Resume", String.valueOf(tailoredResume.getId()),
-                "Tailored from " + resumeId + " for Job " + jobId);
+                "Tailored DOCX from " + resumeId + " for Job " + jobId);
                 
         return tailoredResume;
+    }
+
+    /**
+     * Build a plain-text representation from structured tailored data for rawText storage.
+     */
+    private String buildTextFromStructured(com.jobportal.backend.service.ai.TailoredResumeResult data) {
+        StringBuilder sb = new StringBuilder();
+        if (data.getName() != null) sb.append(data.getName()).append("\n");
+        if (data.getEmail() != null) sb.append(data.getEmail()).append("\n");
+        if (data.getPhone() != null) sb.append(data.getPhone()).append("\n");
+        if (data.getLocation() != null) sb.append(data.getLocation()).append("\n");
+        sb.append("\n");
+        if (data.getSummary() != null) sb.append("SUMMARY\n").append(data.getSummary()).append("\n\n");
+        if (data.getSkills() != null && !data.getSkills().isEmpty()) {
+            sb.append("SKILLS\n").append(String.join(", ", data.getSkills())).append("\n\n");
+        }
+        if (data.getExperience() != null) {
+            sb.append("EXPERIENCE\n");
+            for (var exp : data.getExperience()) {
+                if (exp.getTitle() != null) sb.append(exp.getTitle());
+                if (exp.getCompany() != null) sb.append(" at ").append(exp.getCompany());
+                if (exp.getDuration() != null) sb.append(" (").append(exp.getDuration()).append(")");
+                sb.append("\n");
+                if (exp.getBullets() != null) {
+                    for (String bullet : exp.getBullets()) sb.append("• ").append(bullet).append("\n");
+                }
+                sb.append("\n");
+            }
+        }
+        if (data.getEducation() != null) {
+            sb.append("EDUCATION\n");
+            for (var edu : data.getEducation()) {
+                if (edu.getDegree() != null) sb.append(edu.getDegree());
+                if (edu.getInstitution() != null) sb.append(" — ").append(edu.getInstitution());
+                if (edu.getYear() != null) sb.append(" (").append(edu.getYear()).append(")");
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     private void validateFile(MultipartFile file) {

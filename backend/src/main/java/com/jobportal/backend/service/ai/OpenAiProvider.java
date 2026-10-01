@@ -179,6 +179,25 @@ public class OpenAiProvider implements AiProvider {
         return isAvailable() ? "OpenAI " + model : "KeywordAiProvider (fallback)";
     }
 
+    @Override
+    public TailoredResumeResult tailorResumeStructured(String resumeText, String jobDescription) {
+        if (!isAvailable()) return fallback.tailorResumeStructured(resumeText, jobDescription);
+        try {
+            String schema = "{ \"name\": \"\", \"email\": \"\", \"phone\": \"\", \"location\": \"\", \"summary\": \"\", " +
+                    "\"skills\": [], \"experience\": [{ \"title\": \"\", \"company\": \"\", \"duration\": \"\", \"bullets\": [] }], " +
+                    "\"education\": [{ \"degree\": \"\", \"institution\": \"\", \"year\": \"\" }], " +
+                    "\"certifications\": [], \"projects\": [{ \"name\": \"\", \"description\": \"\", \"technologies\": [] }] }";
+            String json = requestJson(
+                    "Tailor this resume for the job description. Rewrite summary and bullets to align with the job. Do NOT fabricate experience.",
+                    "Return ONLY a JSON object matching: " + schema,
+                    "Original Resume:\n" + safeText(resumeText) + "\n\nJob Description:\n" + safeText(jobDescription));
+            return objectMapper.readValue(json, TailoredResumeResult.class);
+        } catch (Exception ex) {
+            logger.warn("OpenAI structured tailor failed: {}", ex.getMessage());
+            return fallback.tailorResumeStructured(resumeText, jobDescription);
+        }
+    }
+
     private String requestJson(String task, String schema, String input) {
         return request(task, schema, input, true);
     }
@@ -226,4 +245,4 @@ public class OpenAiProvider implements AiProvider {
 
     private String safeText(String value) { return value == null ? "" : value; }
     private String safeList(List<String> values) { return values == null ? "[]" : values.toString(); }
-}
+}
