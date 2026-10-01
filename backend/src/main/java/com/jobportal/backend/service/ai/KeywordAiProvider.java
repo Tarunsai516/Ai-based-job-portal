@@ -20,18 +20,18 @@ public class KeywordAiProvider implements AiProvider {
     private static final Logger logger = LoggerFactory.getLogger(KeywordAiProvider.class);
 
     // Common tech skills for pattern matching
-    private static final Set<String> KNOWN_SKILLS = Set.of(
+    public static final Set<String> KNOWN_SKILLS = Set.of(
         "java", "python", "javascript", "typescript", "c++", "c#", "go", "rust", "ruby", "php", "swift", "kotlin",
-        "react", "angular", "vue", "vue.js", "next.js", "nuxt.js", "svelte", "jquery",
+        "react", "react.js", "reactjs", "angular", "vue", "vue.js", "next.js", "nuxt.js", "svelte", "jquery",
         "spring", "spring boot", "django", "flask", "express", "express.js", "node.js", "nodejs",
         "asp.net", ".net", "rails", "ruby on rails", "laravel", "fastapi",
-        "html", "css", "tailwind", "tailwindcss", "bootstrap", "sass", "less",
+        "html", "html5", "css", "css3", "tailwind", "tailwindcss", "bootstrap", "sass", "less",
         "sql", "mysql", "postgresql", "postgres", "mongodb", "redis", "elasticsearch", "cassandra",
         "oracle", "sqlite", "mariadb", "dynamodb",
         "aws", "azure", "gcp", "google cloud", "heroku", "digitalocean", "firebase",
-        "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins", "ci/cd",
+        "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins", "ci/cd", "ci cd",
         "git", "github", "gitlab", "bitbucket", "svn",
-        "rest", "rest api", "restful", "graphql", "grpc", "websocket", "soap",
+        "rest", "rest api", "restful", "rest apis", "graphql", "grpc", "websocket", "soap",
         "microservices", "kafka", "rabbitmq", "apache kafka",
         "machine learning", "deep learning", "tensorflow", "pytorch", "scikit-learn",
         "nlp", "computer vision", "ai", "artificial intelligence",
@@ -42,7 +42,7 @@ public class KeywordAiProvider implements AiProvider {
         "maven", "gradle", "npm", "yarn", "webpack", "vite",
         "figma", "photoshop", "sketch",
         "pandas", "numpy", "r", "tableau", "power bi",
-        "blockchain", "solidity", "web3"
+        "blockchain", "solidity", "web3", "data structures", "algorithms", "system design"
     );
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
@@ -171,136 +171,164 @@ public class KeywordAiProvider implements AiProvider {
         }
 
         return questions.stream().distinct().limit(10).collect(Collectors.toList());
-    }
-
-    @Override
+    }    @Override
     public ResumeCoachResult coachResume(String resumeText, String jobDescription,
                                           List<String> matchedSkills, List<String> missingSkills) {
         List<ResumeCoachResult.ImprovementSuggestion> suggestions = new ArrayList<>();
         List<String> weakSections = new ArrayList<>();
         Map<String, Integer> sectionScores = new java.util.LinkedHashMap<>();
 
-        String resumeLower = resumeText.toLowerCase();
+        String text = (resumeText != null) ? resumeText : "";
+        String resumeLower = text.toLowerCase();
         String jobLower    = (jobDescription != null) ? jobDescription.toLowerCase() : "";
 
-        // ── 1. Summary / Objective section ──────────────────────────────────
-        int summaryScore = 0;
-        boolean hasSummary = resumeLower.contains("summary") || resumeLower.contains("objective") || resumeLower.contains("profile");
-        if (hasSummary) summaryScore += 30;
-        // Length check — a good summary means a detailed resume
-        if (resumeText.length() > 1500) summaryScore += 30;
-        else if (resumeText.length() > 700) summaryScore += 15;
-        // Job title alignment
-        String[] jobWords = jobLower.split("[\\s,;|]+");
-        long titleHits = Arrays.stream(jobWords)
-                .filter(w -> w.length() > 4 && resumeLower.contains(w))
-                .limit(10).count();
-        summaryScore += (int) Math.min(40, titleHits * 5);
-        sectionScores.put("Summary", Math.min(100, summaryScore));
-        if (summaryScore < 50) {
+        // ── 1. Summary / Objective section (15% weight) ──────────────────────
+        int summaryScore = 20;
+        boolean hasSummary = resumeLower.contains("summary") || resumeLower.contains("objective")
+                || resumeLower.contains("profile") || resumeLower.contains("about me");
+        if (hasSummary) summaryScore += 35;
+        if (text.length() > 1200) summaryScore += 20;
+        else if (text.length() > 500) summaryScore += 10;
+
+        // Job keyword alignment in summary
+        if (!jobLower.isEmpty()) {
+            String[] jobWords = jobLower.split("[\\s,;|:()]+");
+            long titleHits = Arrays.stream(jobWords)
+                    .filter(w -> w.length() > 4 && resumeLower.contains(w))
+                    .distinct()
+                    .limit(10).count();
+            summaryScore += (int) Math.min(25, titleHits * 5);
+        } else {
+            summaryScore += 15;
+        }
+        summaryScore = Math.min(100, Math.max(20, summaryScore));
+        sectionScores.put("Summary", summaryScore);
+
+        if (summaryScore < 60) {
             weakSections.add("Summary");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Summary")
-                    .reason("Add a professional summary that mirrors the job title and key responsibilities. "
-                            + "Recruiters spend an average of 7 seconds on the first scan.")
-                    .suggestedText("Results-driven professional with X+ years of experience in [key area] "
-                            + "seeking to contribute [specific value] at [company type].")
+                    .reason("Add a concise professional summary highlighting your core expertise and value proposition tailored to the target role.")
+                    .suggestedText("Results-driven engineer with expertise in modern technologies, proven track record in building scalable applications, and strong problem-solving capabilities.")
                     .build());
         }
 
-        // ── 2. Skills section ────────────────────────────────────────────────
+        // ── 2. Skills section (30% weight) ──────────────────────────────────
         int skillsScore = 0;
         int totalJobSkills = (missingSkills != null ? missingSkills.size() : 0)
                            + (matchedSkills != null ? matchedSkills.size() : 0);
         int matched = (matchedSkills != null) ? matchedSkills.size() : 0;
+        boolean hasSkillsSection = resumeLower.contains("skills") || resumeLower.contains("technical skills")
+                || resumeLower.contains("technologies") || resumeLower.contains("core competencies");
+
         if (totalJobSkills > 0) {
-            skillsScore = (int) (((double) matched / totalJobSkills) * 80);
+            double ratio = (double) matched / totalJobSkills;
+            skillsScore = (int) Math.round(ratio * 80) + (hasSkillsSection ? 20 : 10);
         } else {
-            skillsScore = resumeLower.contains("skill") ? 50 : 30;
+            // Standalone evaluation against known tech skills
+            long foundCount = KNOWN_SKILLS.stream().filter(s -> resumeLower.contains(s.toLowerCase())).count();
+            if (foundCount >= 8) skillsScore = 90;
+            else if (foundCount >= 5) skillsScore = 78;
+            else if (foundCount >= 3) skillsScore = 65;
+            else skillsScore = 45;
         }
-        // Bonus for having a dedicated skills section
-        if (resumeLower.contains("technical skills") || resumeLower.contains("core competencies")) skillsScore += 15;
-        sectionScores.put("Skills", Math.min(100, skillsScore));
+        skillsScore = Math.min(100, Math.max(20, skillsScore));
+        sectionScores.put("Skills", skillsScore);
+
         if (skillsScore < 60) {
             weakSections.add("Skills");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Skills")
-                    .reason("Your resume is missing key skills required for this role: "
+                    .reason("Your resume is missing key technical skills required for this position: "
                             + (missingSkills != null && !missingSkills.isEmpty()
-                               ? String.join(", ", missingSkills.stream().limit(6).toList())
-                               : "several job-required skills are not visible."))
+                               ? String.join(", ", missingSkills.stream().limit(5).toList())
+                               : "add relevant technologies from the job requirements."))
+                    .suggestedText("Create a dedicated 'Technical Skills' section categorizing Languages, Frameworks, Databases, and Cloud/DevOps tools.")
                     .build());
         }
 
-        // ── 3. Experience section ────────────────────────────────────────────
-        int expScore = 0;
-        // Quantified achievements are the strongest signal
-        boolean hasNumbers = Pattern.compile("\\d+%|\\$\\d+|\\d+\\s*(users|customers|projects|team|engineers|clients|revenue|ms|million|billion)",
-                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
-        if (hasNumbers) expScore += 35;
-        // Action verb richness
+        // ── 3. Experience section (35% weight) ──────────────────────────────
+        int expScore = 15;
+        // Check for job titles
+        Pattern titlePat = Pattern.compile("engineer|developer|architect|lead|manager|analyst|specialist|intern|consultant", Pattern.CASE_INSENSITIVE);
+        if (titlePat.matcher(text).find()) expScore += 25;
+
+        // Check for date ranges (e.g. 2020 - 2024, Jan 2021 - Present)
+        Pattern datePat = Pattern.compile("(?:20[0-2]\\d|19\\d\\d)\\s*[-–—to]+\\s*(?:20[0-2]\\d|present|current)", Pattern.CASE_INSENSITIVE);
+        if (datePat.matcher(text).find() || resumeLower.contains("years")) expScore += 20;
+
+        // Action verbs
         String[] actionVerbs = {"led", "built", "designed", "architected", "improved", "reduced",
                 "increased", "launched", "delivered", "managed", "mentored", "scaled", "optimized",
-                "implemented", "developed", "created", "deployed", "automated", "collaborated"};
+                "implemented", "developed", "created", "deployed", "automated", "collaborated", "engineered"};
         long verbCount = Arrays.stream(actionVerbs).filter(resumeLower::contains).count();
-        expScore += (int) Math.min(35, verbCount * 3);
-        // Experience keyword match with job
-        if (jobLower.length() > 0) {
-            String[] expKeywords = {"experience", "year", "worked", "developed", "contributed"};
-            long expHits = Arrays.stream(expKeywords).filter(k -> resumeLower.contains(k) && jobLower.contains(k)).count();
-            expScore += (int) Math.min(30, expHits * 8);
-        } else {
-            if (resumeLower.contains("experience")) expScore += 20;
-        }
-        sectionScores.put("Experience", Math.min(100, expScore));
-        if (!hasNumbers) {
+        expScore += (int) Math.min(25, verbCount * 4);
+
+        // Quantified achievements
+        boolean hasNumbers = Pattern.compile("\\d+%|\\$\\d+|\\d+\\+?\\s*(?:users|customers|projects|team|engineers|clients|revenue|ms|million|billion|requests)",
+                Pattern.CASE_INSENSITIVE).matcher(text).find();
+        if (hasNumbers) expScore += 20;
+
+        expScore = Math.min(100, Math.max(20, expScore));
+        sectionScores.put("Experience", expScore);
+
+        if (!hasNumbers || expScore < 60) {
             weakSections.add("Experience");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Experience")
-                    .reason("Add quantified achievements with specific numbers. "
-                            + "E.g., 'Reduced API latency by 40%' or 'Led a team of 6 engineers to deliver X on schedule.'")
-                    .suggestedText("Use the format: [Action verb] + [What you did] + [Result with a number]")
+                    .reason("Strengthen bullet points with measurable impact and quantifiable results (e.g., %, scale, latency, dollar savings).")
+                    .suggestedText("Improved system performance by 35% and reduced API latency from 450ms to 120ms by implementing Redis caching and indexing.")
                     .build());
         }
 
-        // ── 4. Education section ─────────────────────────────────────────────
-        int eduScore = 0;
-        boolean hasDegree = Pattern.compile("bachelor|master|phd|mba|b\\.s|m\\.s|b\\.e|m\\.e|diploma|associate",
-                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
-        if (hasDegree) eduScore += 60;
-        boolean hasInstitution = Pattern.compile("university|college|institute|school",
-                Pattern.CASE_INSENSITIVE).matcher(resumeText).find();
-        if (hasInstitution) eduScore += 25;
-        boolean hasGradYear = Pattern.compile("20[0-2]\\d|19[89]\\d").matcher(resumeText).find();
+        // ── 4. Education section (12% weight) ───────────────────────────────
+        int eduScore = 20;
+        boolean hasDegree = Pattern.compile("bachelor|master|phd|mba|b\\.s|m\\.s|b\\.e|m\\.e|b\\.tech|m\\.tech|btech|mtech|bca|mca|associate|diploma|computer science|engineering|information technology",
+                Pattern.CASE_INSENSITIVE).matcher(text).find();
+        if (hasDegree) eduScore += 45;
+
+        boolean hasInstitution = Pattern.compile("university|college|institute|school|academy",
+                Pattern.CASE_INSENSITIVE).matcher(text).find();
+        if (hasInstitution) eduScore += 20;
+
+        boolean hasGradYear = Pattern.compile("20[0-2]\\d|19[89]\\d").matcher(text).find();
         if (hasGradYear) eduScore += 15;
-        sectionScores.put("Education", Math.min(100, eduScore));
-        if (eduScore < 40) {
+
+        eduScore = Math.min(100, Math.max(20, eduScore));
+        sectionScores.put("Education", eduScore);
+
+        if (eduScore < 50) {
             weakSections.add("Education");
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Education")
-                    .reason("Make sure your highest degree, institution name, field of study, and graduation year are clearly stated.")
+                    .reason("Clearly list your degree, major/specialization, institution name, and graduation year.")
                     .build());
         }
 
-        // ── 5. Projects & Certifications ────────────────────────────────────
-        int projectScore = 0;
+        // ── 5. Projects & Certifications (8% weight) ────────────────────────
+        int projectScore = 25;
         boolean hasProjects = resumeLower.contains("project") || resumeLower.contains("portfolio") || resumeLower.contains("github");
-        if (hasProjects) projectScore += 40;
-        boolean hasCerts = resumeLower.contains("certified") || resumeLower.contains("certification") || resumeLower.contains("certificate");
-        if (hasCerts) projectScore += 40;
-        boolean hasLinks = resumeLower.contains("linkedin") || resumeLower.contains("github.com") || resumeLower.contains("http");
-        if (hasLinks) projectScore += 20;
-        sectionScores.put("Projects & Certifications", Math.min(100, projectScore));
+        if (hasProjects) projectScore += 35;
+
+        boolean hasCerts = resumeLower.contains("certified") || resumeLower.contains("certification") || resumeLower.contains("certificate") || resumeLower.contains("aws certified");
+        if (hasCerts) projectScore += 25;
+
+        boolean hasLinks = resumeLower.contains("linkedin.com") || resumeLower.contains("github.com") || resumeLower.contains("http");
+        if (hasLinks) projectScore += 15;
+
+        projectScore = Math.min(100, Math.max(20, projectScore));
+        sectionScores.put("Projects & Certifications", projectScore);
+
         if (!hasProjects && !hasCerts) {
             suggestions.add(ResumeCoachResult.ImprovementSuggestion.builder()
                     .section("Projects & Certifications")
-                    .reason("Add 2–3 portfolio projects or relevant certifications. "
-                            + "These are strong differentiators when your work experience is limited.")
+                    .reason("Add 2-3 technical projects or industry certifications to showcase hands-on experience.")
+                    .suggestedText("Built a full-stack real-time application using React and Spring Boot with automated CI/CD pipeline deployed on AWS.")
                     .build());
         }
 
         // ── Overall weighted score ───────────────────────────────────────────
-        int overall = (int) (
+        int overall = (int) Math.round(
             sectionScores.get("Summary")                    * 0.15 +
             sectionScores.get("Skills")                     * 0.30 +
             sectionScores.get("Experience")                 * 0.35 +

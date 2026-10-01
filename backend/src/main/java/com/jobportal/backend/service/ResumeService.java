@@ -269,15 +269,42 @@ public class ResumeService {
             jobParts.add("Benefits: " + String.join(", ", job.getBenefits()));
         String jobText = String.join("\n\n", jobParts);
 
-        // Compute matched and missing skills from resume raw text — different per resume
-        java.util.List<String> jobSkills = job.getSkills() != null ? job.getSkills() : java.util.Collections.emptyList();
+        // Collect job skills: use explicit list or extract from job description & qualifications
+        java.util.Set<String> allJobSkills = new java.util.LinkedHashSet<>();
+        if (job.getSkills() != null) {
+            allJobSkills.addAll(job.getSkills());
+        }
+        if (allJobSkills.isEmpty()) {
+            for (String skill : com.jobportal.backend.service.ai.KeywordAiProvider.KNOWN_SKILLS) {
+                if (java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(skill) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(jobText).find()) {
+                    allJobSkills.add(skill);
+                }
+            }
+        }
+
+        // Compute matched and missing skills from resume text with alias & variation support
         String resumeLower = resume.getRawText().toLowerCase();
-        java.util.List<String> matchedSkills = jobSkills.stream()
-                .filter(skill -> resumeLower.contains(skill.toLowerCase()))
-                .collect(java.util.stream.Collectors.toList());
-        java.util.List<String> missingSkills = jobSkills.stream()
-                .filter(skill -> !resumeLower.contains(skill.toLowerCase()))
-                .collect(java.util.stream.Collectors.toList());
+        java.util.List<String> matchedSkills = new java.util.ArrayList<>();
+        java.util.List<String> missingSkills = new java.util.ArrayList<>();
+
+        for (String skill : allJobSkills) {
+            String sLower = skill.toLowerCase().trim();
+            boolean isMatched = resumeLower.contains(sLower);
+            if (!isMatched) {
+                if (sLower.contains("react")) isMatched = resumeLower.contains("react");
+                else if (sLower.contains("node")) isMatched = resumeLower.contains("node");
+                else if (sLower.contains("spring")) isMatched = resumeLower.contains("spring");
+                else if (sLower.contains("postgres")) isMatched = resumeLower.contains("postgres");
+                else if (sLower.contains("k8s") || sLower.contains("kubernetes")) isMatched = resumeLower.contains("k8s") || resumeLower.contains("kubernetes");
+                else if (sLower.contains("js") || sLower.contains("javascript")) isMatched = resumeLower.contains("javascript") || resumeLower.contains("js");
+                else if (sLower.contains("ts") || sLower.contains("typescript")) isMatched = resumeLower.contains("typescript") || resumeLower.contains("ts");
+            }
+            if (isMatched) {
+                matchedSkills.add(skill);
+            } else {
+                missingSkills.add(skill);
+            }
+        }
 
         return aiProvider.coachResume(resume.getRawText(), jobText, matchedSkills, missingSkills);
     }
