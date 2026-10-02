@@ -929,6 +929,108 @@ export default function JobDetails() {
                               </div>
                             </div>
 
+                            {/* ── LIVE RESUME PREVIEW ── */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+                              <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                <h4 className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                  <span>👁️</span> Live Resume Preview
+                                </h4>
+                                <span className="text-[10px] text-slate-400 italic">Updates as you edit</span>
+                              </div>
+                              {/* Resume Paper */}
+                              <div className="p-4 overflow-auto max-h-[500px] bg-gray-100 dark:bg-slate-950">
+                                <div className="bg-white shadow-lg mx-auto max-w-2xl p-8 text-slate-900 font-sans" style={{ minHeight: '600px' }}>
+                                  {/* Header */}
+                                  <div className="text-center border-b-2 border-slate-800 pb-4 mb-4">
+                                    <h1 className="text-2xl font-extrabold uppercase tracking-wide text-slate-900" style={{ letterSpacing: '0.1em' }}>
+                                      {tailorPreview.name || 'Your Name'}
+                                    </h1>
+                                    <p className="text-xs text-slate-500 mt-1 space-x-2">
+                                      {[tailorPreview.email, tailorPreview.phone, tailorPreview.location].filter(Boolean).join('  •  ')}
+                                    </p>
+                                  </div>
+
+                                  {/* Summary */}
+                                  {tailorPreview.summary && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Professional Summary</h2>
+                                      <p className="text-xs text-slate-700 leading-relaxed">{tailorPreview.summary}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Skills */}
+                                  {(tailorPreview.skills || []).length > 0 && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Core Skills</h2>
+                                      <p className="text-xs text-slate-700 leading-relaxed">{(tailorPreview.skills || []).join('  •  ')}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Experience */}
+                                  {(tailorPreview.experience || []).length > 0 && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Work Experience</h2>
+                                      <div className="space-y-3">
+                                        {(tailorPreview.experience || []).map((exp, i) => (
+                                          <div key={i}>
+                                            <div className="flex justify-between items-baseline">
+                                              <span className="text-xs font-bold text-slate-900">{exp.title || 'Job Title'}</span>
+                                              <span className="text-[10px] text-slate-500 font-medium">{exp.duration || ''}</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-600 italic mb-1">{exp.company || ''}</p>
+                                            {(exp.bullets || []).map((b, bi) => (
+                                              <p key={bi} className="text-[11px] text-slate-700 pl-3 before:content-['•'] before:mr-2 before:text-slate-400 leading-snug">{b}</p>
+                                            ))}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Projects */}
+                                  {(tailorPreview.projects || []).length > 0 && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Projects</h2>
+                                      <div className="space-y-2">
+                                        {(tailorPreview.projects || []).map((proj, i) => (
+                                          <div key={i}>
+                                            <span className="text-xs font-bold text-slate-900">{proj.name || 'Project'}</span>
+                                            {proj.description && <p className="text-[11px] text-slate-700 leading-snug mt-0.5">{proj.description}</p>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Education */}
+                                  {(tailorPreview.education || []).length > 0 && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Education</h2>
+                                      <div className="space-y-1">
+                                        {(tailorPreview.education || []).map((edu, i) => (
+                                          <div key={i} className="flex justify-between items-baseline">
+                                            <div>
+                                              <span className="text-xs font-bold text-slate-900">{edu.degree || ''}</span>
+                                              {edu.institution && <span className="text-[11px] text-slate-600"> — {edu.institution}</span>}
+                                            </div>
+                                            {edu.year && <span className="text-[10px] text-slate-500">{edu.year}</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Certifications */}
+                                  {(tailorPreview.certifications || []).length > 0 && (
+                                    <div className="mb-4">
+                                      <h2 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-800 border-b border-slate-300 pb-0.5 mb-2">Certifications</h2>
+                                      <p className="text-xs text-slate-700">{(tailorPreview.certifications || []).join(', ')}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
                             {/* Format selection & Final Generation Action */}
                             <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

@@ -400,8 +400,8 @@ public class ResumeService {
         try (InputStream is = Files.newInputStream(Paths.get(filePath))) {
             return tika.parseToString(is);
         } catch (Exception e) {
-            logger.error("Tika text extraction failed for {}: {}", filePath, e.getMessage());
-            throw new RuntimeException("Text extraction failed: " + e.getMessage());
+            logger.warn("Tika text extraction failed for {}: {}", filePath, e.getMessage());
+            return null;
         }
     }
 
@@ -553,6 +553,7 @@ public class ResumeService {
     /**
      * Preview AI tailoring recommendations and structured sections before saving.
      */
+    @Transactional
     public com.jobportal.backend.service.ai.TailoredResumeResult previewTailorResume(Long resumeId, Long jobId, Long userId) {
         Candidate candidate = candidateRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate profile not found for user: " + userId));
@@ -569,16 +570,71 @@ public class ResumeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found: " + jobId));
 
         String resumeText = original.getRawText();
+
+        // Fallback 1: try reading from physical file (may fail on ephemeral disk)
         if (resumeText == null || resumeText.isBlank()) {
-            resumeText = extractText(original.getStoredPath());
-            if (resumeText != null && !resumeText.isBlank()) {
-                original.setRawText(resumeText);
-                resumeRepository.save(original);
+            if (original.getStoredPath() != null) {
+                String extracted = extractText(original.getStoredPath());
+                if (extracted != null && !extracted.isBlank()) {
+                    resumeText = extracted;
+                    original.setRawText(resumeText);
+                    resumeRepository.save(original);
+                }
             }
         }
 
+        // Fallback 2: reconstruct approximate text from parsedDataJson stored in DB
+        if ((resumeText == null || resumeText.isBlank()) && original.getParsedDataJson() != null && !original.getParsedDataJson().isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(original.getParsedDataJson());
+                StringBuilder sb = new StringBuilder();
+                if (node.has("name")) sb.append(node.get("name").asText()).append("\n");
+                if (node.has("email")) sb.append(node.get("email").asText()).append("\n");
+                if (node.has("phone")) sb.append(node.get("phone").asText()).append("\n");
+                if (node.has("summary")) sb.append("\nSUMMARY\n").append(node.get("summary").asText()).append("\n");
+                if (node.has("skills") && node.get("skills").isArray()) {
+                    sb.append("\nSKILLS\n");
+                    node.get("skills").forEach(s -> sb.append(s.asText()).append(", "));
+                    sb.append("\n");
+                }
+                if (node.has("experience") && node.get("experience").isArray()) {
+                    sb.append("\nEXPERIENCE\n");
+                    node.get("experience").forEach(exp -> {
+                        if (exp.has("title")) sb.append(exp.get("title").asText()).append(" at ");
+                        if (exp.has("company")) sb.append(exp.get("company").asText());
+                        sb.append("\n");
+                        if (exp.has("description")) sb.append(exp.get("description").asText()).append("\n");
+                    });
+                }
+                if (node.has("education") && node.get("education").isArray()) {
+                    sb.append("\nEDUCATION\n");
+                    node.get("education").forEach(edu -> {
+                        if (edu.has("degree")) sb.append(edu.get("degree").asText());
+                        if (edu.has("institution")) sb.append(" - ").append(edu.get("institution").asText());
+                        sb.append("\n");
+                    });
+                }
+                resumeText = sb.toString().trim();
+                logger.info("Using parsedDataJson as fallback text source for resume {}", resumeId);
+            } catch (Exception e) {
+                logger.warn("Failed to reconstruct text from parsedDataJson for resume {}: {}", resumeId, e.getMessage());
+            }
+        }
+
+        // If still no text, use candidate profile as minimal seed
         if (resumeText == null || resumeText.isBlank()) {
-            throw new BadRequestException("Could not extract text from this resume. Please re-upload.");
+            StringBuilder seed = new StringBuilder();
+            if (candidate.getName() != null) seed.append(candidate.getName()).append("\n");
+            if (candidate.getEmail() != null) seed.append(candidate.getEmail()).append("\n");
+            List<String> candidateSkills = candidate.getSkills();
+            if (candidateSkills != null && !candidateSkills.isEmpty()) {
+                seed.append("\nSKILLS\n").append(String.join(", ", candidateSkills)).append("\n");
+            }
+            resumeText = seed.toString().trim();
+            if (resumeText.isBlank()) {
+                throw new BadRequestException("Could not extract text from this resume. Please re-upload the resume file.");
+            }
+            logger.info("Using candidate profile as minimal text seed for resume tailor preview for resumeId={}", resumeId);
         }
 
         List<String> jobParts = new ArrayList<>();
@@ -592,7 +648,23 @@ public class ResumeService {
             jobParts.add("Requirements & Qualifications:\n- " + String.join("\n- ", job.getQualifications()));
         String jobText = String.join("\n\n", jobParts);
 
-        return aiProvider.tailorResumeStructured(resumeText, jobText);
+        com.jobportal.backend.service.ai.TailoredResumeResult result = aiProvider.tailorResumeStructured(resumeText, jobText);
+
+        // Ensure contact fields are populated from candidate profile if AI missed them
+        if ((result.getName() == null || result.getName().isBlank()) && candidate.getName() != null) {
+            result.setName(candidate.getName());
+        }
+        if ((result.getEmail() == null || result.getEmail().isBlank()) && candidate.getEmail() != null) {
+            result.setEmail(candidate.getEmail());
+        }
+        if ((result.getPhone() == null || result.getPhone().isBlank()) && candidate.getPhone() != null) {
+            result.setPhone(candidate.getPhone());
+        }
+        if ((result.getLocation() == null || result.getLocation().isBlank()) && candidate.getLocation() != null) {
+            result.setLocation(candidate.getLocation());
+        }
+
+        return result;
     }
 
     /**
