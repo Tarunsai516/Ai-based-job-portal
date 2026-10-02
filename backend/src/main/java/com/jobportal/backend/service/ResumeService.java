@@ -706,17 +706,17 @@ public class ResumeService {
             throw new BadRequestException("File size exceeds maximum of 10MB");
         }
         String filename = file.getOriginalFilename();
-        if (filename == null) {
+        if (filename == null || filename.isBlank()) {
             throw new BadRequestException("Filename is required");
         }
         String ext = getExtension(filename).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(ext)) {
-            throw new BadRequestException("Invalid file format. Allowed: PDF, DOCX");
+            throw new BadRequestException("Invalid file format. Allowed: PDF, DOCX, DOC. Got: " + ext);
         }
+        // Log content type for debugging — some browsers/OS send octet-stream
         String contentType = file.getContentType();
-        if (contentType != null && !ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            logger.warn("Unexpected content type: {} for file: {}", contentType, filename);
-        }
+        logger.info("Resume upload: filename={}, extension={}, contentType={}, size={}",
+                filename, ext, contentType, file.getSize());
     }
 
     private String getExtension(String filename) {
