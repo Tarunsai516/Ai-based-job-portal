@@ -63,8 +63,14 @@ public class ApplicationController {
     private Long getCurrentCandidateId(CustomUserDetails currentUser) {
         return candidateRepository.findByUserId(currentUser.getId())
                 .or(() -> candidateRepository.findByEmail(currentUser.getEmail()))
-                .map(candidate -> candidate.getId())
-                .orElseThrow(() -> new ForbiddenException("Candidate profile is not available"));
+                .orElseGet(() -> candidateRepository.save(
+                        com.jobportal.backend.model.Candidate.builder()
+                                .userId(currentUser.getId())
+                                .name(currentUser.getName())
+                                .email(currentUser.getEmail())
+                                .build()
+                ))
+                .getId();
     }
 
     @PatchMapping("/{id}/status")

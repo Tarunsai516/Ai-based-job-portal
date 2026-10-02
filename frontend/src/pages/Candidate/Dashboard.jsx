@@ -63,7 +63,13 @@ export default function CandidateDashboard() {
             : null;
         })
         .filter(Boolean);
-      setRecommendations(matchedJobs);
+
+      // Show AI recommendations if available; otherwise show latest live openings from allJobs
+      if (matchedJobs.length > 0) {
+        setRecommendations(matchedJobs);
+      } else {
+        setRecommendations(allJobs.slice(0, 5));
+      }
 
     } catch (err) {
       console.error('Failed loading candidate dashboard:', err);
@@ -276,10 +282,16 @@ export default function CandidateDashboard() {
 
                         {/* AI Match Badge */}
                         <div className="text-right">
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold px-2.5 py-1 rounded-full inline-flex items-center space-x-1">
-                            <HiOutlineSparkles className="h-3.5 w-3.5" />
-                            <span>{job.matchScore}% Match</span>
-                          </span>
+                          {job.matchScore != null ? (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold px-2.5 py-1 rounded-full inline-flex items-center space-x-1">
+                              <HiOutlineSparkles className="h-3.5 w-3.5" />
+                              <span>{job.matchScore}% Match</span>
+                            </span>
+                          ) : (
+                            <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-2.5 py-1 rounded-full inline-flex items-center space-x-1">
+                              <span>New Opening</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 

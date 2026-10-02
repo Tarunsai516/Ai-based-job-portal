@@ -22,6 +22,9 @@ api.interceptors.request.use(
         }
       }
     }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }

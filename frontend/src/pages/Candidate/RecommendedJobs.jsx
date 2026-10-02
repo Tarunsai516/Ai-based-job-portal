@@ -33,14 +33,15 @@ export default function RecommendedJobs() {
         applicationService.getByCandidateId(resolvedCandidateId).catch(() => [])
       ]);
     }).then(([matchPage, allJobs, myApps]) => {
-      const jobsById = new Map((Array.isArray(allJobs) ? allJobs : []).map(job => [String(job.id), job]));
+      const jobsList = Array.isArray(allJobs) ? allJobs : [];
+      const jobsById = new Map(jobsList.map(job => [String(job.id), job]));
       const matchedJobs = (matchPage?.content || [])
         .map(match => {
           const job = jobsById.get(String(match.jobId));
           return job ? { ...job, matchScore: match.overallScore, matchExplanation: match.explanation } : null;
         })
         .filter(Boolean);
-      setJobs(matchedJobs);
+      setJobs(matchedJobs.length > 0 ? matchedJobs : jobsList);
       setAppliedJobIds((Array.isArray(myApps) ? myApps : []).map(a => String(a.jobId)));
       setLoading(false);
     }).catch(() => setLoading(false));

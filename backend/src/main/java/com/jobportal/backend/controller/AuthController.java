@@ -31,6 +31,9 @@ public class AuthController {
     private UserRepository userRepository;
 
     @Autowired
+    private com.jobportal.backend.repository.CandidateRepository candidateRepository;
+
+    @Autowired
     private PasswordEncoder encoder;
 
     @Autowired
@@ -48,6 +51,18 @@ public class AuthController {
         String rawPassword = user.getPassword();
         user.setPassword(encoder.encode(rawPassword));
         User savedUser = userRepository.save(user);
+
+        if ("seeker".equalsIgnoreCase(savedUser.getRole())) {
+            candidateRepository.findByUserId(savedUser.getId())
+                .or(() -> candidateRepository.findByEmail(savedUser.getEmail()))
+                .orElseGet(() -> candidateRepository.save(
+                        com.jobportal.backend.model.Candidate.builder()
+                                .userId(savedUser.getId())
+                                .name(savedUser.getName())
+                                .email(savedUser.getEmail())
+                                .build()
+                ));
+        }
 
         String jwt = jwtUtils.generateTokenFromEmail(
                 savedUser.getEmail(),

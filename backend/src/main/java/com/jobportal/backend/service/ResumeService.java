@@ -101,7 +101,9 @@ public class ResumeService {
         try {
             Files.createDirectories(uploadPath);
             Path filePath = uploadPath.resolve(storedFilename);
-            file.transferTo(filePath.toFile());
+            try (java.io.InputStream in = file.getInputStream()) {
+                Files.copy(in, filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
 
             Resume resume = Resume.builder()
                     .candidateId(candidateId)

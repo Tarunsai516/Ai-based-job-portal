@@ -40,26 +40,29 @@ export default function JobListings() {
   });
 
   useEffect(() => {
-    if (!user) {
-      jobService.getAll().then(setJobs).catch((err) => console.error(err));
-      return;
-    }
+    // 1. Always fetch jobs immediately regardless of auth / profile status
+    jobService.getAll()
+      .then((data) => setJobs(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Failed to fetch jobs:', err));
 
+    if (!user) return;
+
+    // 2. Load candidate profile, applications, and AI recommendations gracefully
     candidateService.getMyProfile()
-      .then(profile => Promise.all([
-        jobService.getAll(),
-        applicationService.getByCandidateId(profile.id),
-        recommendationService.getForCandidate(profile.id, 0, 50).catch(() => ({ content: [] }))
-      ]))
-      .then(([jobData, apps, recommendationPage]) => {
-        setJobs(jobData);
-        setApplications(Array.isArray(apps) ? apps : []);
-        setAppliedJobs(apps.map(a => String(a.jobId)));
-        setMatchScores(new Map(
-          (recommendationPage?.content || []).map(match => [String(match.jobId), match])
-        ));
+      .then((profile) => {
+        if (!profile?.id) return;
+        return Promise.all([
+          applicationService.getByCandidateId(profile.id).catch(() => []),
+          recommendationService.getForCandidate(profile.id, 0, 50).catch(() => ({ content: [] }))
+        ]).then(([apps, recommendationPage]) => {
+          setApplications(Array.isArray(apps) ? apps : []);
+          setAppliedJobs((Array.isArray(apps) ? apps : []).map(a => String(a.jobId)));
+          setMatchScores(new Map(
+            (recommendationPage?.content || []).map(match => [String(match.jobId), match])
+          ));
+        });
       })
-      .catch((err) => console.error(err));
+      .catch((err) => console.warn('Could not load profile or recommendations for seeker:', err));
   }, [user]);
 
   const handleApply = async (job) => {
@@ -93,21 +96,26 @@ export default function JobListings() {
 
   // ── Filter by search + sidebar filters ──────────────────────────────────────
   const filteredJobs = jobs.filter((job) => {
+    const title = (job.title || '').toLowerCase();
+    const company = (job.companyName || '').toLowerCase();
+    const skills = Array.isArray(job.skills) ? job.skills : [];
+    const searchLower = searchVal.toLowerCase();
+
     const matchesSearch =
-      job.title.toLowerCase().includes(searchVal.toLowerCase()) ||
-      job.companyName.toLowerCase().includes(searchVal.toLowerCase()) ||
-      job.skills.some((s) => s.toLowerCase().includes(searchVal.toLowerCase()));
+      title.includes(searchLower) ||
+      company.includes(searchLower) ||
+      skills.some((s) => (s || '').toLowerCase().includes(searchLower));
 
     const matchesLocation =
       !filters.location ||
-      job.location.toLowerCase().includes(filters.location.toLowerCase());
+      (job.location || '').toLowerCase().includes(filters.location.toLowerCase());
 
     const matchesType =
       filters.types.length === 0 || filters.types.includes(job.type);
 
     let matchesExp = true;
     if (filters.experience.length > 0) {
-      const expLower = job.experience.toLowerCase();
+      const expLower = (job.experience || '').toLowerCase();
       matchesExp = filters.experience.some((level) => {
         if (level === 'Senior') return expLower.includes('5+') || expLower.includes('6+');
         if (level === 'Mid')    return expLower.includes('3+') || expLower.includes('4+');

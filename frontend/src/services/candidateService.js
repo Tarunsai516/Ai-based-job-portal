@@ -17,10 +17,8 @@ export const candidateService = {
   },
 
   uploadResume: async (formData) => {
-    // formData is already a FormData object passed in from the component
-    const response = await api.post('/candidates/resume/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Let browser set the multipart Content-Type header with proper boundary
+    const response = await api.post('/candidates/resume/upload', formData);
     return response.data;
   },
 

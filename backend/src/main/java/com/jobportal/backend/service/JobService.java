@@ -37,7 +37,13 @@ public class JobService {
         String locParam = (location != null && !location.trim().isEmpty()) ? location.trim() : null;
         String typeParam = (type != null && !type.trim().isEmpty()) ? type.trim() : null;
 
-        List<Job> filteredJobs = jobRepository.filterJobs(rIdParam, rEmailParam, rEmailOnlyParam, qParam, locParam, typeParam);
+        boolean hasFilters = rIdParam != null || rEmailParam != null || rEmailOnlyParam != null
+                || qParam != null || locParam != null || typeParam != null;
+
+        List<Job> filteredJobs = hasFilters
+                ? jobRepository.filterJobs(rIdParam, rEmailParam, rEmailOnlyParam, qParam, locParam, typeParam)
+                : jobRepository.findAll();
+
         return filteredJobs.stream()
                 .map(JobResponse::fromEntity)
                 .collect(Collectors.toList());

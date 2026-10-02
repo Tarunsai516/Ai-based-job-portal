@@ -85,7 +85,8 @@ export default function ResumeUpload() {
     } catch (err) {
       setProgress(0);
       setUploading(false);
-      setToast({ message: err.message || 'Upload failed. Please try again.', type: 'error' });
+      const errorMsg = err.response?.data?.message || err.message || 'Upload failed. Please try again.';
+      setToast({ message: errorMsg, type: 'error' });
     }
   };
 
